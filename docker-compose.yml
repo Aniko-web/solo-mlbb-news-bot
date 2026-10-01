@@ -1,0 +1,37 @@
+services:
+  mlbb-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mlbb_news_agent
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./mlbb_news.db:/app/mlbb_news.db
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/mlbb_news.db
+      - PYTHONUNBUFFERED=1
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Optional production PostgreSQL database
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: mlbb_postgres
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_DB: mlbb_news
+  #     POSTGRES_USER: mlbb_user
+  #     POSTGRES_PASSWORD: mlbb_secure_password
+  #   volumes:
+  #     - pgdata:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+
+# volumes:
+#   pgdata:
