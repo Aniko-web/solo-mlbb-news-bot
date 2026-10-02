@@ -40,7 +40,12 @@ class TelegramPublisher:
 
     def __init__(self, bot: Optional[Bot] = None):
         self.bot = bot
-        self.channel_id = settings.channel_chat_id
+        if self.bot is None:
+            token = get_settings().TELEGRAM_BOT_TOKEN
+            if token and len(token) > 10 and ":" in token:
+                from aiogram.client.default import DefaultBotProperties
+                self.bot = Bot(token=token, default=DefaultBotProperties(parse_mode="HTML"))
+        self.channel_id = get_settings().channel_chat_id
 
     async def publish_post(
         self,
@@ -51,19 +56,16 @@ class TelegramPublisher:
     ) -> Optional[int]:
         """
         Publish post to all configured Telegram channels with photo attachment.
-        Returns telegram message ID if successful.
+        Returns telegram message ID if successful, or None if failed.
         """
-        channel_ids = settings.channel_ids
+        current_settings = get_settings()
+        channel_ids = current_settings.channel_ids
         if not self.bot or not channel_ids:
-            logger.warning("Telegram Bot or Channel ID not configured. Simulated publish.")
-            async with get_session() as session:
-                await PostRepository.update_status(
-                    session=session,
-                    post_id=post_id,
-                    status=PostStatus.PUBLISHED.value,
-                    telegram_message_id=999999
-                )
-            return 999999
+            logger.error(
+                f"Cannot publish post #{post_id}: Telegram Bot or Channel ID not configured! "
+                f"(bot={bool(self.bot)}, channel_ids={channel_ids})"
+            )
+            return None
 
         try:
             # Ensure post has channel signature footer at the end if not already present

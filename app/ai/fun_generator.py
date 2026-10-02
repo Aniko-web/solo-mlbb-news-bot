@@ -273,6 +273,7 @@ class FunContentGenerator:
         }
         callout = callouts.get(topic_type.upper(), "💬 <i>Fikringizni izohlarda qoldiring!</i>")
 
+        tags_str = " ".join(hashtags) if hashtags else "#mlbb #murodalievgg"
         from app.ai.formatter import CHANNEL_FOOTER
 
         caption = (

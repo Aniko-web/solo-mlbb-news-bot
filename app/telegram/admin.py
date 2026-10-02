@@ -413,13 +413,22 @@ async def handle_publish_callback(callback: CallbackQuery, bot: Bot):
             image_url=post.image_url
         )
 
-        await callback.answer("✅ Post kanalga muvaffaqiyatli joylandi!")
-        if callback.message:
-            try:
-                await callback.message.edit_reply_markup(reply_markup=None)
-            except Exception:
-                pass
-            await callback.message.reply(f"✅ <b>Post #{post_id} kanalga joylandi</b> (Xabar ID: {msg_id})")
+        if msg_id:
+            await callback.answer("✅ Post kanalga muvaffaqiyatli joylandi!")
+            if callback.message:
+                try:
+                    await callback.message.edit_reply_markup(reply_markup=None)
+                except Exception:
+                    pass
+                await callback.message.reply(f"✅ <b>Post #{post_id} kanalga joylandi</b> (Xabar ID: <code>{msg_id}</code>)", parse_mode="HTML")
+        else:
+            await callback.answer("❌ Xatolik: Post kanalga yuborilmadi!", show_alert=True)
+            if callback.message:
+                await callback.message.reply(
+                    f"❌ <b>Post #{post_id} kanalga yuborilmadi!</b>\n\n"
+                    "Iltimos, botning kanalda <b>Admin</b> ekanligini va <code>.env</code> dagi <code>TELEGRAM_CHANNEL_ID</code> to‘g‘riligini tekshiring.",
+                    parse_mode="HTML"
+                )
 
 
 @admin_router.callback_query(F.data.startswith("reject:"))

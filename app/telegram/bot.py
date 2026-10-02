@@ -717,7 +717,17 @@ async def cmd_send(message: Message, bot: Bot):
             image_url=post.image_url
         )
 
-    await message.reply(f"✅ Post #{post_id} kanalga yuborildi (Msg ID: {msg_id})")
+    if msg_id:
+        await message.reply(f"✅ <b>Post #{post_id} kanalga yuborildi!</b> (Xabar ID: <code>{msg_id}</code>)", parse_mode="HTML")
+    else:
+        await message.reply(
+            f"❌ <b>Post #{post_id} kanalga yuborilmadi!</b>\n\n"
+            "Sabablari:\n"
+            "1. <code>.env</code> faylida <code>TELEGRAM_CHANNEL_ID</code> to‘g‘ri kiritilmagan bo‘lishi mumkin.\n"
+            "2. Bot ko‘rsatilgan kanalda <b>Admin</b> emas yoki kanaldan chiqarib yuborilgan.\n\n"
+            "💡 Tekshirish uchun /status buyrug‘ini bosing.",
+            parse_mode="HTML"
+        )
 
 
 @bot_router.message(Command("fun"))
