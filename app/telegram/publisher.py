@@ -66,6 +66,11 @@ class TelegramPublisher:
             return 999999
 
         try:
+            # Ensure post has channel signature footer at the end if not already present
+            if "Telegram sahifamiz" not in formatted_text:
+                from app.ai.formatter import CHANNEL_FOOTER
+                formatted_text = f"{formatted_text.rstrip()}\n\n{CHANNEL_FOOTER}"
+
             # 1. If image bytes not passed directly, try loading from local file or downloading from image_url
             if not image_bytes and image_url:
                 try:

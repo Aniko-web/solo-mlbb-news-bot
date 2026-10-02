@@ -1,5 +1,18 @@
 from typing import Dict, Any, List, Optional
 from app.utils.validators import CategoryEnum
+from app.config.settings import get_settings
+
+settings = get_settings()
+CHANNEL_FOOTER = getattr(
+    settings,
+    "CHANNEL_FOOTER",
+    (
+        "💬 Telegram sahifamiz: <a href=\"https://t.me/murodalievgg\">Murodalievgg</a>\n"
+        "📹 Instagram sahifamiz: <a href=\"https://instagram.com/murodalievgg\">Murodalievgg</a>\n"
+        "📹 Youtube sahifamiz: <a href=\"https://youtube.com/@murodalievgg\">Murodalievgg</a>\n"
+        "😍 Donat Uchun:  <a href=\"https://playdom.uz\">Playdom</a>"
+    )
+)
 
 
 class PostFormatter:
@@ -24,7 +37,8 @@ class PostFormatter:
             f"{summary}"
             f"{points_block}\n\n"
             f"🔗 <b>Manba:</b> <a href=\"{source_url}\">Rasmiy havola</a>\n\n"
-            f"#MLBB #Yangilik"
+            f"#MLBB #Yangilik\n\n"
+            f"{CHANNEL_FOOTER}"
         )
 
     @staticmethod
@@ -44,7 +58,8 @@ class PostFormatter:
             f"📅 <b>Chiqish sanasi:</b> {release_date}\n\n"
             f"{description}\n\n"
             f"🔗 <b>Manba:</b> <a href=\"{source_url}\">Batafsil</a>\n\n"
-            f"#MLBB #Skin"
+            f"#MLBB #Skin\n\n"
+            f"{CHANNEL_FOOTER}"
         )
 
     @staticmethod
@@ -99,7 +114,8 @@ class PostFormatter:
                     lines.append(f"🟡 <b>ADJUSTMENT:</b> {', '.join(adjustments)}")
 
         lines.append(f"\n🔗 <b>Batafsil ma'lumot:</b> <a href=\"{source_url}\">Rasmiy havola</a>\n")
-        lines.append("#MLBB #Patch #Yangilanish #MobileLegends")
+        lines.append("#MLBB #Patch #Yangilanish #MobileLegends\n")
+        lines.append(CHANNEL_FOOTER)
 
         return "\n".join(lines)
 
@@ -123,7 +139,8 @@ class PostFormatter:
                 lines.append(f"• {sk}")
         if source_url:
             lines.append(f"\n🔗 <b>Batafsil:</b> <a href=\"{source_url}\">Ko‘rish</a>\n")
-        lines.append("#MLBB #Hero #Yangilik")
+        lines.append("#MLBB #Hero #Yangilik\n")
+        lines.append(CHANNEL_FOOTER)
         return "\n".join(lines)
 
     @staticmethod
@@ -147,7 +164,8 @@ class PostFormatter:
                 lines.append(f"• {rw}")
         if source_url:
             lines.append(f"\n🔗 <b>Batafsil:</b> <a href=\"{source_url}\">Rasmiy manba</a>\n")
-        lines.append("#MLBB #Event #Tadbir")
+        lines.append("#MLBB #Event #Tadbir\n")
+        lines.append(CHANNEL_FOOTER)
         return "\n".join(lines)
 
     @staticmethod
@@ -163,7 +181,8 @@ class PostFormatter:
             lines.append(f"🎮 <b>{m.get('team_a', 'Team A')}</b> 🆚 <b>{m.get('team_b', 'Team B')}</b>")
             lines.append(f"🕐 {m.get('time', 'TBD')}\n")
 
-        lines.append("#MPLID #MLBB")
+        lines.append("#MPLID #MLBB\n")
+        lines.append(CHANNEL_FOOTER)
         return "\n".join(lines)
 
     @staticmethod
@@ -196,7 +215,8 @@ class PostFormatter:
         if source_url:
             lines.append(f"🔗 <b>Batafsil:</b> <a href=\"{source_url}\">Havola</a>\n")
 
-        lines.append("#MPLID #MLBB @murodalievgg")
+        lines.append("#MPLID #MLBB @murodalievgg\n")
+        lines.append(CHANNEL_FOOTER)
         return "\n".join(lines)
 
     @staticmethod
@@ -229,7 +249,8 @@ class PostFormatter:
         if source_url:
             lines.append(f"🔗 <b>Batafsil:</b> <a href=\"{source_url}\">Havola</a>\n")
 
-        lines.append("#MPLPH #MLBB @murodalievgg")
+        lines.append("#MPLPH #MLBB @murodalievgg\n")
+        lines.append(CHANNEL_FOOTER)
         return "\n".join(lines)
 
     @classmethod
@@ -305,7 +326,8 @@ class PostFormatter:
         if source_url:
             lines.append(f"🔗 <b>Batafsil:</b> <a href=\"{source_url}\">Liquipedia</a>\n")
 
-        lines.append("#MPLID #MLBB @murodalievgg")
+        lines.append("#MPLID #MLBB @murodalievgg\n")
+        lines.append(CHANNEL_FOOTER)
         return "\n".join(lines)
 
     @staticmethod
@@ -342,7 +364,8 @@ class PostFormatter:
         if source_url:
             lines.append(f"🔗 <b>Batafsil:</b> <a href=\"{source_url}\">Liquipedia</a>\n")
 
-        lines.append("#MPLPH #MLBB @murodalievgg")
+        lines.append("#MPLPH #MLBB @murodalievgg\n")
+        lines.append(CHANNEL_FOOTER)
         return "\n".join(lines)
 
     @classmethod
@@ -398,5 +421,6 @@ class PostFormatter:
             f"{tourney_line}"
             f"{summary}\n\n"
             f"🔗 <b>Batafsil:</b> <a href=\"{source_url}\">Rasmiy manba</a>\n\n"
-            f"#Esports #MLBB"
+            f"#Esports #MLBB\n\n"
+            f"{CHANNEL_FOOTER}"
         )

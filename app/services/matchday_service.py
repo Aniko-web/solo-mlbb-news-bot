@@ -428,7 +428,9 @@ class MatchdayService:
 
         lines.append("")
         lines.append("📺 <i>Jonli efir va o‘yin natijalarini kanalimizda kuzatib boring!</i>")
-        lines.append(f"\n{hashtag} #MLBB #Esports #Jadval @murodalievgg")
+        lines.append(f"\n{hashtag} #MLBB #Esports #Jadval @murodalievgg\n")
+        from app.ai.formatter import CHANNEL_FOOTER
+        lines.append(CHANNEL_FOOTER)
 
         return "\n".join(lines)
 
@@ -474,7 +476,9 @@ class MatchdayService:
                 lines.append(f"• <b>{ta} vs {tb}</b> — ⏰ {m_time}")
             lines.append("")
 
-        lines.append(f"{hashtag} #MLBB #Esports @murodalievgg")
+        lines.append(f"{hashtag} #MLBB #Esports @murodalievgg\n")
+        from app.ai.formatter import CHANNEL_FOOTER
+        lines.append(CHANNEL_FOOTER)
         return "\n".join(lines)
 
     @classmethod
