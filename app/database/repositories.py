@@ -3,7 +3,7 @@ from typing import List, Optional, Tuple, Dict, Any
 from sqlalchemy import select, update, func, and_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database.models import Post, Match, Source, SystemLog, Hero, Skin, AdminUser
+from app.database.models import Post, Match, Source, SystemLog, Hero, Skin, AdminUser, ChannelConfig
 from app.utils.validators import MatchItem, PostStatus, CategoryEnum, utc_now
 from app.utils.logger import logger
 
@@ -408,3 +408,60 @@ class AdminRepository:
         query = select(AdminUser).order_by(AdminUser.id)
         result = await session.execute(query)
         return list(result.scalars().all())
+
+
+class ChannelRepository:
+    @staticmethod
+    async def get_active_channel_ids(session: AsyncSession) -> List[str]:
+        query = select(ChannelConfig.channel_id).where(ChannelConfig.is_active == True)
+        result = await session.execute(query)
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def add_channel(
+        session: AsyncSession,
+        channel_id: str,
+        title: Optional[str] = None,
+        username: Optional[str] = None,
+        added_by: Optional[int] = None
+    ) -> bool:
+        query = select(ChannelConfig).where(ChannelConfig.channel_id == channel_id).limit(1)
+        result = await session.execute(query)
+        existing = result.scalar_one_or_none()
+        if existing:
+            existing.is_active = True
+            if title:
+                existing.title = title
+            if username:
+                existing.username = username
+            await session.flush()
+            return False  # Already existed, now reactivated
+
+        chan = ChannelConfig(
+            channel_id=channel_id,
+            title=title,
+            username=username,
+            is_active=True,
+            added_by=added_by
+        )
+        session.add(chan)
+        await session.flush()
+        return True
+
+    @staticmethod
+    async def remove_channel(session: AsyncSession, channel_id: str) -> bool:
+        query = select(ChannelConfig).where(ChannelConfig.channel_id == channel_id).limit(1)
+        result = await session.execute(query)
+        chan = result.scalar_one_or_none()
+        if not chan:
+            return False
+        await session.delete(chan)
+        await session.flush()
+        return True
+
+    @staticmethod
+    async def list_channels(session: AsyncSession) -> List[ChannelConfig]:
+        query = select(ChannelConfig).order_by(ChannelConfig.id)
+        result = await session.execute(query)
+        return list(result.scalars().all())
+

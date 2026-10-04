@@ -147,3 +147,16 @@ class AdminUser(Base):
     full_name = Column(String(128), nullable=True)
     added_by = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=utc_now, server_default=func.now())
+
+
+class ChannelConfig(Base):
+    __tablename__ = "channel_configs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    channel_id = Column(String(64), unique=True, nullable=False, index=True)
+    title = Column(String(256), nullable=True)
+    username = Column(String(128), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    added_by = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=utc_now, server_default=func.now())
+

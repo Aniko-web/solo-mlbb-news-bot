@@ -33,6 +33,23 @@ def _split_caption(text: str, max_len: int = 1020) -> tuple[str, Optional[str]]:
     return caption, rest
 
 
+async def get_effective_channel_ids() -> list[str]:
+    """Return all unique channel IDs combining .env and database channel_configs."""
+    current_settings = get_settings()
+    ids = list(current_settings.channel_ids)
+    try:
+        from app.database.database import get_session
+        from app.database.repositories import ChannelRepository
+        async with get_session() as session:
+            db_ids = await ChannelRepository.get_active_channel_ids(session)
+            for db_id in db_ids:
+                if db_id not in ids:
+                    ids.append(db_id)
+    except Exception as e:
+        logger.debug(f"Could not load channel IDs from database: {e}")
+    return ids
+
+
 class TelegramPublisher:
     """
     Publishes verified posts to the target Telegram Channel with photo support.
@@ -81,15 +98,17 @@ class TelegramPublisher:
         Returns telegram message ID if successful, or None if failed.
         """
         self.last_errors = {}
-        current_settings = get_settings()
-        channel_ids = current_settings.channel_ids
+        channel_ids = await get_effective_channel_ids()
         if not self.bot or not channel_ids:
             err = (
                 f"Cannot publish post #{post_id}: Telegram Bot or Channel ID not configured! "
                 f"(bot={bool(self.bot)}, channel_ids={channel_ids})"
             )
             logger.error(err)
-            self.last_errors["global"] = ".env faylida TELEGRAM_CHANNEL_ID sozlanmagan yoki bo‘sh"
+            self.last_errors["global"] = (
+                ".env faylida yoki bot bazasida birorta ham kanal sozlanmagan. "
+                "Kanalni ulash uchun botga /setchannel &lt;kanal_id&gt; buyrug‘ini yuboring yoki kanaldan biror xabarni botga forward qiling."
+            )
             return None
 
         try:

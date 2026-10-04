@@ -2,20 +2,28 @@ from datetime import datetime
 from typing import Optional, Dict
 from aiogram import Bot, Dispatcher, Router, F
 from aiogram.filters import Command
-from aiogram.types import Message, ChatMemberUpdated, MessageOriginChannel
+from aiogram.types import (
+    Message,
+    ChatMemberUpdated,
+    MessageOriginChannel,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    CallbackQuery
+)
 from aiogram.client.default import DefaultBotProperties
 
-from app.config.settings import get_settings
+from app.config.settings import get_settings, reload_settings, normalize_channel_identifier, PROJECT_ENV
 from app.utils.logger import logger
 from app.utils.validators import utc_now
 from app.database.database import get_session
 from app.database.repositories import (
     PostRepository,
     SourceRepository,
-    SystemLogRepository
+    SystemLogRepository,
+    ChannelRepository
 )
 from app.telegram.admin import admin_router, is_authorized_admin
-from app.telegram.publisher import TelegramPublisher
+from app.telegram.publisher import TelegramPublisher, get_effective_channel_ids
 
 settings = get_settings()
 bot_router = Router(name="bot_router")
@@ -132,6 +140,80 @@ async def cmd_latest(message: Message):
     await message.reply("\n".join(lines), parse_mode="HTML")
 
 
+async def connect_channel_core(bot: Bot, target: str, added_by: Optional[int] = None) -> tuple[bool, str]:
+    import re
+    cid = normalize_channel_identifier(target)
+    try:
+        chat = await bot.get_chat(cid)
+    except Exception as e:
+        return False, f"❌ <b>Kanal topilmadi:</b> <code>{target}</code>\n<i>Telegram xatosi: {e}</i>\n\n💡 Bot kanalga Admin qilib qo‘shilganini tekshiring."
+
+    # Check bot permissions
+    can_post = True
+    try:
+        member = await bot.get_chat_member(chat.id, bot.id)
+        if member.status not in ["administrator", "creator"]:
+            return False, (
+                f"⚠️ <b>Bot bu kanalda Admin emas!</b>\n\n"
+                f"📌 Kanal: <b>{chat.title}</b> (<code>{chat.id}</code>)\n"
+                f"Holati: <code>{member.status}</code>\n\n"
+                "Iltimos, avval botni kanalga <b>Admin</b> qilib qo‘shing va <b>Post Messages (Xabarlarni joylash)</b> huquqini bering."
+            )
+        can_post = getattr(member, "can_post_messages", True)
+    except Exception as perm_err:
+        logger.warning(f"Could not verify chat member: {perm_err}")
+
+    # 1. Save to Database
+    try:
+        async with get_session() as session:
+            await ChannelRepository.add_channel(
+                session=session,
+                channel_id=str(chat.id),
+                title=chat.title,
+                username=chat.username,
+                added_by=added_by
+            )
+            await session.commit()
+    except Exception as db_err:
+        logger.error(f"Failed to save channel to database: {db_err}")
+
+    # 2. Update .env if present and writable
+    try:
+        import os
+        if os.path.exists(PROJECT_ENV):
+            with open(PROJECT_ENV, "r", encoding="utf-8") as f:
+                content = f.read()
+            if "TELEGRAM_CHANNEL_ID=" in content:
+                old_val_match = re.search(r"^TELEGRAM_CHANNEL_ID=(.*)$", content, flags=re.MULTILINE)
+                if old_val_match and old_val_match.group(1).strip():
+                    old_ids = [x.strip() for x in old_val_match.group(1).split(",") if x.strip()]
+                    if str(chat.id) not in old_ids:
+                        old_ids.append(str(chat.id))
+                    new_line = f"TELEGRAM_CHANNEL_ID={', '.join(old_ids)}"
+                else:
+                    new_line = f"TELEGRAM_CHANNEL_ID={chat.id}"
+                new_content = re.sub(r"^TELEGRAM_CHANNEL_ID=.*$", new_line, content, flags=re.MULTILINE)
+            else:
+                new_content = f"{content.rstrip()}\nTELEGRAM_CHANNEL_ID={chat.id}\n"
+            with open(PROJECT_ENV, "w", encoding="utf-8") as f:
+                f.write(new_content)
+    except Exception as env_err:
+        logger.warning(f"Could not update .env: {env_err}")
+
+    # 3. Reload settings
+    reload_settings()
+
+    uname_str = f" (@{chat.username})" if chat.username else ""
+    post_warning = "" if can_post else "\n⚠️ <b>Eslatma:</b> Botga kanal sozlamalarida 'Post Messages' huquqini yoqing!"
+    return True, (
+        f"🎉 <b>Kanal muvaffaqiyatli ulandi!</b>\n\n"
+        f"📌 Nomi: <b>{chat.title}</b>{uname_str}\n"
+        f"🆔 ID: <code>{chat.id}</code>\n"
+        f"✅ Holat: Bazaga saqlandi va faollashtirildi!{post_warning}\n\n"
+        "Endi yangiliklar va o‘yin kartalari ushbu kanalga avtomatik chiqariladi!"
+    )
+
+
 @bot_router.message(Command("channels"))
 async def cmd_channels(message: Message, bot: Bot):
     user_id = message.from_user.id if message.from_user else 0
@@ -139,11 +221,14 @@ async def cmd_channels(message: Message, bot: Bot):
         await message.reply("Faqat admin uchun ruxsat berilgan.")
         return
 
-    channel_ids = settings.channel_ids
+    channel_ids = await get_effective_channel_ids()
     if not channel_ids:
         await message.reply(
             "⚠️ <b>Hozircha hech qanday kanal ulanmagan.</b>\n\n"
-            ".env fayliga <code>TELEGRAM_CHANNEL_ID=-100xxxxxxxxxx</code> ni kiriting.",
+            "💡 <b>Kanalni ulash juda oson:</b>\n"
+            "1. Botingizni kanalingizga <b>Admin</b> qilib qo‘shing.\n"
+            "2. Ushbu botga: <code>/setchannel &lt;kanal_id yoki @username&gt;</code> buyrug‘ini yuboring.\n"
+            "<i>(Yoki kanaldan birorta xabarni ushbu botga forward qiling)</i>",
             parse_mode="HTML"
         )
         return
@@ -174,8 +259,71 @@ async def cmd_channels(message: Message, bot: Bot):
         except Exception as e:
             lines.append(f"{idx}. ❌ <code>{cid}</code> — <i>Ulanib bo‘lmadi ({e}). Botingiz kanalda Admin ekanligini tekshiring!</i>\n")
 
-    lines.append("💡 <i>Yangi kanal ulash: kanaldan postni ushbu botga forward qiling yoki kanal username/ID sini botga yuboring.</i>")
+    lines.append("💡 <i>Yangi kanal ulash: <code>/setchannel &lt;kanal_id yoki @username&gt;</code> yoki kanaldan postni ushbu botga forward qiling.</i>")
     await message.reply("\n".join(lines), parse_mode="HTML")
+
+
+@bot_router.message(Command("setchannel", "addchannel"))
+async def cmd_set_channel(message: Message, bot: Bot):
+    user_id = message.from_user.id if message.from_user else 0
+    if not await is_authorized_admin(user_id):
+        await message.reply("Faqat admin uchun ruxsat berilgan.")
+        return
+
+    parts = (message.text or "").split(maxsplit=1)
+    if len(parts) < 2 or not parts[1].strip():
+        await message.reply(
+            "Foydalanish: <code>/setchannel &lt;kanal_id yoki @username&gt;</code>\n\n"
+            "Masalan:\n"
+            "<code>/setchannel -1002202639176</code>\n"
+            "<code>/setchannel @murodalievgg</code>",
+            parse_mode="HTML"
+        )
+        return
+
+    target = parts[1].strip()
+    await message.reply("⏳ <i>Kanal tekshirilmoqda va ulanmoqda...</i>", parse_mode="HTML")
+    ok, text = await connect_channel_core(bot, target, added_by=user_id)
+    await message.reply(text, parse_mode="HTML")
+
+
+@bot_router.message(Command("delchannel"))
+async def cmd_del_channel(message: Message):
+    user_id = message.from_user.id if message.from_user else 0
+    if not await is_authorized_admin(user_id):
+        await message.reply("Faqat admin uchun ruxsat berilgan.")
+        return
+
+    parts = (message.text or "").split(maxsplit=1)
+    if len(parts) < 2 or not parts[1].strip():
+        await message.reply("Foydalanish: <code>/delchannel &lt;kanal_id&gt;</code>", parse_mode="HTML")
+        return
+
+    target = parts[1].strip()
+    cid = normalize_channel_identifier(target)
+    async with get_session() as session:
+        removed = await ChannelRepository.remove_channel(session, cid)
+        await session.commit()
+    reload_settings()
+
+    if removed:
+        await message.reply(f"✅ Kanal <code>{cid}</code> bazadan muvaffaqiyatli o‘chirildi.", parse_mode="HTML")
+    else:
+        await message.reply(f"ℹ️ Kanal <code>{cid}</code> bazada topilmadi.")
+
+
+@bot_router.callback_query(F.data.startswith("connect_chan:"))
+async def handle_connect_channel_callback(callback: CallbackQuery, bot: Bot):
+    user_id = callback.from_user.id
+    if not await is_authorized_admin(user_id):
+        await callback.answer("Ruxsat berilmagan.", show_alert=True)
+        return
+
+    cid = callback.data.split(":", 1)[1]
+    await callback.answer("Kanal ulanmoqda...")
+    ok, text = await connect_channel_core(bot, cid, added_by=user_id)
+    if callback.message:
+        await callback.message.reply(text, parse_mode="HTML")
 
 
 @bot_router.my_chat_member()
@@ -194,12 +342,14 @@ async def handle_my_chat_member(update: ChatMemberUpdated, bot: Bot):
                 f"📌 Nomi: <b>{title}</b>\n"
                 f"🆔 Kanal ID: <code>{chat.id}</code>\n"
                 f"🔗 Username: {uname}\n\n"
-                f"Ushbu kanalga yangiliklar chiqarish uchun <code>.env</code> faylidagi <code>TELEGRAM_CHANNEL_ID</code> ga mana shu ID ni kiriting:\n"
-                f"<code>TELEGRAM_CHANNEL_ID={chat.id}</code>"
+                f"Ushbu kanalni botga ulash uchun quyidagi tugmani bosing:"
+            )
+            kb = InlineKeyboardMarkup(
+                inline_keyboard=[[InlineKeyboardButton(text="➕ Kanalni botga ulash", callback_data=f"connect_chan:{chat.id}")]]
             )
             for adm in admins:
                 try:
-                    await bot.send_message(chat_id=adm, text=msg, parse_mode="HTML")
+                    await bot.send_message(chat_id=adm, text=msg, reply_markup=kb, parse_mode="HTML")
                 except Exception:
                     pass
 
@@ -241,12 +391,12 @@ async def handle_forwarded_chat(message: Message, bot: Bot):
 
     lines.append(
         "\n✅ <b>Ushbu kanalga postlar chiqarish uchun:</b>\n"
-        "1. Botingizni ushbu kanalga <b>Admin</b> (post joylash huquqi bilan) qilib qo‘shing.\n"
-        "2. <code>.env</code> faylidagi <code>TELEGRAM_CHANNEL_ID</code> ga mana shu ID ni kiriting:\n"
-        f"<code>TELEGRAM_CHANNEL_ID={chat.id}</code>\n\n"
-        "Shundan so‘ng bot avtomatik ravishda yangiliklarni ushbu kanalga chiqaradi!"
+        "Quyidagi tugmani bosing yoki <code>/setchannel " + str(chat.id) + "</code> deb yozing:"
     )
-    await message.reply("\n".join(lines), parse_mode="HTML")
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text="➕ Ushbu kanalni botga ulash", callback_data=f"connect_chan:{chat.id}")]]
+    )
+    await message.reply("\n".join(lines), reply_markup=kb, parse_mode="HTML")
 
 
 @bot_router.message(F.text.regexp(r"^(?:https?://t\.me/|@)([a-zA-Z0-9_]{4,})$"))
@@ -273,14 +423,17 @@ async def handle_channel_link_or_username(message: Message, bot: Bot):
         except Exception:
             perm_text = "\n⚠️ Bot bu kanalda admin emas. Kanalga admin qilib qo‘shing."
 
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[[InlineKeyboardButton(text="➕ Ushbu kanalni botga ulash", callback_data=f"connect_chan:{chat.id}")]]
+        )
         await message.reply(
             f"📢 <b>Kanal topildi!</b>\n\n"
             f"📌 Nomi: <b>{chat.title}</b>\n"
             f"🆔 Kanal ID: <code>{chat.id}</code>\n"
             f"🔗 Username: @{chat.username or username.lstrip('@')}"
             f"{perm_text}\n\n"
-            f"Kanalga post chiqarish uchun <code>.env</code> dagi <code>TELEGRAM_CHANNEL_ID</code> ga mana shu ID ni kiriting:\n"
-            f"<code>TELEGRAM_CHANNEL_ID={chat.id}</code>",
+            "Ushbu kanalni botga ulash uchun quyidagi tugmani bosing:",
+            reply_markup=kb,
             parse_mode="HTML"
         )
     except Exception as e:
@@ -313,11 +466,15 @@ async def handle_numeric_id_query(message: Message, bot: Bot):
     cid = f"-100{raw_id}" if not raw_id.startswith("-") else raw_id
     try:
         chat = await bot.get_chat(cid)
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[[InlineKeyboardButton(text="➕ Ushbu kanalni botga ulash", callback_data=f"connect_chan:{chat.id}")]]
+        )
         await message.reply(
             f"✅ <b>Kanal topildi!</b>\n"
             f"Nomi: <b>{chat.title}</b>\n"
             f"ID: <code>{chat.id}</code>\n\n"
-            f"Kanalni ulash uchun: <code>.env</code> dagi <code>TELEGRAM_CHANNEL_ID</code> ga mana shu ID ni kiriting.",
+            "Ushbu kanalni botga ulash uchun quyidagi tugmani bosing:",
+            reply_markup=kb,
             parse_mode="HTML"
         )
     except Exception as e:

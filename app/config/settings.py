@@ -4,12 +4,16 @@ from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+PROJECT_ENV = os.path.join(PROJECT_ROOT, ".env")
+
+
 class Settings(BaseSettings):
     """
     Application configuration loaded from environment variables and .env file.
     """
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(PROJECT_ENV, ".env"),
         env_file_encoding="utf-8",
         extra="ignore"
     )
@@ -147,3 +151,31 @@ class Settings(BaseSettings):
 @lru_cache()
 def get_settings() -> Settings:
     return Settings()
+
+
+def reload_settings() -> Settings:
+    """Clear lru_cache and reload settings from environment and .env."""
+    get_settings.cache_clear()
+    return get_settings()
+
+
+def normalize_channel_identifier(cid: str) -> str:
+    """Normalize any channel identifier (url, handle, numeric id) into standard format."""
+    import re
+    cid = str(cid).strip()
+    if not cid:
+        return ""
+    cid = re.sub(r"^https?://t\.me/", "@", cid)
+    cid = re.sub(r"^t\.me/", "@", cid)
+    if cid.isdigit():
+        return f"-100{cid}"
+    elif cid.startswith("-"):
+        digits = cid[1:]
+        if digits.isdigit() and not cid.startswith("-100"):
+            return f"-100{digits}"
+        return cid
+    elif re.match(r"^[a-zA-Z0-9_]{4,}$", cid) and not cid.startswith("@"):
+        return f"@{cid}"
+    return cid
+
+
