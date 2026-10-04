@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional, Dict
 from aiogram import Bot, Dispatcher, Router, F
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import Message, ChatMemberUpdated, MessageOriginChannel
 from aiogram.client.default import DefaultBotProperties
 
 from app.config.settings import get_settings
@@ -148,28 +148,74 @@ async def cmd_channels(message: Message, bot: Bot):
         )
         return
 
-    lines = ["📢 <b>Ulangan Telegram Kanallar:</b>\n"]
+    lines = ["📢 <b>Ulangan Telegram Kanallar va Ruxsatlar:</b>\n"]
     for idx, cid in enumerate(channel_ids, 1):
         if str(bot.id) in str(cid):
             lines.append(f"{idx}. ⚠️ <code>{cid}</code> — <i>Xatolik: Bu botning o‘z ID si! Kanal ID si -100 bilan boshlanishi kerak.</i>\n")
             continue
         try:
             chat = await bot.get_chat(cid)
-            lines.append(f"{idx}. ✅ <b>{chat.title}</b> (<code>{cid}</code>)\n   Turi: {chat.type} | Ulanish: Muvaffaqiyatli\n")
+            perm_status = "Tekshirilmoqda..."
+            try:
+                member = await bot.get_chat_member(cid, bot.id)
+                is_admin = member.status in ["administrator", "creator"]
+                can_post = getattr(member, "can_post_messages", True) if is_admin else False
+                if is_admin and can_post:
+                    perm_status = "✅ <b>Ulanish a'lo</b> (Admin | Xabar chiqarish: Bor)"
+                elif is_admin and not can_post:
+                    perm_status = "⚠️ <b>Ruxsat kam:</b> Bot Admin, lekin <i>Post Messages</i> (xabar chiqarish) huquqi o‘chiq!"
+                else:
+                    perm_status = f"❌ <b>Admin emas!</b> (Status: {member.status}). Botni kanalga Admin qiling."
+            except Exception as perm_err:
+                perm_status = f"ℹ️ Ruxsatni tekshirib bo‘lmadi ({perm_err})"
+
+            uname = f" (@{chat.username})" if chat.username else ""
+            lines.append(f"{idx}. 📌 <b>{chat.title}</b>{uname}\n   ID: <code>{cid}</code> | Turi: {chat.type}\n   Holat: {perm_status}\n")
         except Exception as e:
             lines.append(f"{idx}. ❌ <code>{cid}</code> — <i>Ulanib bo‘lmadi ({e}). Botingiz kanalda Admin ekanligini tekshiring!</i>\n")
 
-    lines.append("💡 <i>Yangi kanal qo‘shish uchun: yangi kanaldan istalgan postni ushbu botga forward qiling yoki uning ID sini .env dagi TELEGRAM_CHANNEL_ID ga vergul bilan qo‘shing.</i>")
+    lines.append("💡 <i>Yangi kanal ulash: kanaldan postni ushbu botga forward qiling yoki kanal username/ID sini botga yuboring.</i>")
     await message.reply("\n".join(lines), parse_mode="HTML")
 
 
-@bot_router.message(F.forward_from_chat)
+@bot_router.my_chat_member()
+async def handle_my_chat_member(update: ChatMemberUpdated, bot: Bot):
+    """Triggered when bot is added to a channel/group or its permissions change."""
+    chat = update.chat
+    new_status = update.new_chat_member.status
+    if chat.type in ["channel", "supergroup"]:
+        if new_status == "administrator":
+            from app.telegram.admin import get_effective_admin_ids
+            admins = await get_effective_admin_ids()
+            title = chat.title or "Kanal"
+            uname = f"@{chat.username}" if chat.username else "Mavjud emas (Yopiq kanal)"
+            msg = (
+                f"🎉 <b>Bot yangi kanalga Admin qilindi!</b>\n\n"
+                f"📌 Nomi: <b>{title}</b>\n"
+                f"🆔 Kanal ID: <code>{chat.id}</code>\n"
+                f"🔗 Username: {uname}\n\n"
+                f"Ushbu kanalga yangiliklar chiqarish uchun <code>.env</code> faylidagi <code>TELEGRAM_CHANNEL_ID</code> ga mana shu ID ni kiriting:\n"
+                f"<code>TELEGRAM_CHANNEL_ID={chat.id}</code>"
+            )
+            for adm in admins:
+                try:
+                    await bot.send_message(chat_id=adm, text=msg, parse_mode="HTML")
+                except Exception:
+                    pass
+
+
+@bot_router.message(F.forward_origin | F.forward_from_chat)
 async def handle_forwarded_chat(message: Message, bot: Bot):
     user_id = message.from_user.id if message.from_user else 0
     if not await is_authorized_admin(user_id):
         return
 
-    chat = message.forward_from_chat
+    chat = None
+    if message.forward_origin and isinstance(message.forward_origin, MessageOriginChannel):
+        chat = message.forward_origin.chat
+    elif message.forward_from_chat:
+        chat = message.forward_from_chat
+
     if not chat:
         return
 
@@ -183,14 +229,67 @@ async def handle_forwarded_chat(message: Message, bot: Bot):
     if chat.username:
         lines.append(f"🔗 Username: @{chat.username}")
 
+    try:
+        member = await bot.get_chat_member(chat.id, bot.id)
+        if member.status in ["administrator", "creator"]:
+            can_post = getattr(member, "can_post_messages", True)
+            lines.append(f"\n✅ Bot bu kanalda <b>Admin</b> (Xabar joylash: {'Bor' if can_post else 'Yo‘q'})")
+        else:
+            lines.append(f"\n⚠️ Bot hali bu kanalda admin emas (Status: {member.status}).")
+    except Exception:
+        lines.append("\n⚠️ Bot hali bu kanalda admin emas. Botni kanalga Admin qilib qo‘shing.")
+
     lines.append(
         "\n✅ <b>Ushbu kanalga postlar chiqarish uchun:</b>\n"
         "1. Botingizni ushbu kanalga <b>Admin</b> (post joylash huquqi bilan) qilib qo‘shing.\n"
-        "2. <code>.env</code> faylidagi <code>TELEGRAM_CHANNEL_ID</code> ga vergul bilan qo‘shing:\n"
-        f"<code>TELEGRAM_CHANNEL_ID={settings.TELEGRAM_CHANNEL_ID}, {chat.id}</code>\n\n"
-        "Shundan so‘ng bot avtomatik ravishda yangiliklarni ushbu kanalga ham yuboradi!"
+        "2. <code>.env</code> faylidagi <code>TELEGRAM_CHANNEL_ID</code> ga mana shu ID ni kiriting:\n"
+        f"<code>TELEGRAM_CHANNEL_ID={chat.id}</code>\n\n"
+        "Shundan so‘ng bot avtomatik ravishda yangiliklarni ushbu kanalga chiqaradi!"
     )
     await message.reply("\n".join(lines), parse_mode="HTML")
+
+
+@bot_router.message(F.text.regexp(r"^(?:https?://t\.me/|@)([a-zA-Z0-9_]{4,})$"))
+async def handle_channel_link_or_username(message: Message, bot: Bot):
+    user_id = message.from_user.id if message.from_user else 0
+    if not await is_authorized_admin(user_id):
+        return
+
+    import re
+    match = re.search(r"([a-zA-Z0-9_]{4,})$", (message.text or "").strip())
+    if not match:
+        return
+    username = f"@{match.group(1)}"
+    try:
+        chat = await bot.get_chat(username)
+        perm_text = ""
+        try:
+            member = await bot.get_chat_member(chat.id, bot.id)
+            if member.status in ["administrator", "creator"]:
+                can_post = getattr(member, "can_post_messages", True)
+                perm_text = f"\n✅ Bot bu kanalda <b>Admin</b> (Xabar joylash huquqi: {'Bor' if can_post else 'Yo‘q'})"
+            else:
+                perm_text = f"\n⚠️ Bot bu kanalda admin emas (Status: {member.status})."
+        except Exception:
+            perm_text = "\n⚠️ Bot bu kanalda admin emas. Kanalga admin qilib qo‘shing."
+
+        await message.reply(
+            f"📢 <b>Kanal topildi!</b>\n\n"
+            f"📌 Nomi: <b>{chat.title}</b>\n"
+            f"🆔 Kanal ID: <code>{chat.id}</code>\n"
+            f"🔗 Username: @{chat.username or username.lstrip('@')}"
+            f"{perm_text}\n\n"
+            f"Kanalga post chiqarish uchun <code>.env</code> dagi <code>TELEGRAM_CHANNEL_ID</code> ga mana shu ID ni kiriting:\n"
+            f"<code>TELEGRAM_CHANNEL_ID={chat.id}</code>",
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        await message.reply(
+            f"❌ <b>Kanal topilmadi:</b> <code>{username}</code>\n"
+            f"Tafsilot: <i>{e}</i>\n\n"
+            "💡 Kanal ochiq (public) ekanligini yoki bot kanalga admin qilib qo‘shilganini tekshiring.",
+            parse_mode="HTML"
+        )
 
 
 @bot_router.message(F.text.regexp(r"^-?\d{8,15}$"))
@@ -720,12 +819,13 @@ async def cmd_send(message: Message, bot: Bot):
     if msg_id:
         await message.reply(f"✅ <b>Post #{post_id} kanalga yuborildi!</b> (Xabar ID: <code>{msg_id}</code>)", parse_mode="HTML")
     else:
+        err_summary = publisher.last_error_summary()
         await message.reply(
             f"❌ <b>Post #{post_id} kanalga yuborilmadi!</b>\n\n"
-            "Sabablari:\n"
-            "1. <code>.env</code> faylida <code>TELEGRAM_CHANNEL_ID</code> to‘g‘ri kiritilmagan bo‘lishi mumkin.\n"
-            "2. Bot ko‘rsatilgan kanalda <b>Admin</b> emas yoki kanaldan chiqarib yuborilgan.\n\n"
-            "💡 Tekshirish uchun /status buyrug‘ini bosing.",
+            f"⚠️ <b>Xatolik sababi:</b>\n{err_summary}\n\n"
+            "💡 <b>Tavsiya:</b>\n"
+            "1. Botingiz kanalda <b>Admin</b> ekanligi va unga <b>Post Messages</b> (xabar chiqarish) huquqi berilganini tekshiring.\n"
+            "2. Kanal ID yoki username <code>.env</code> da to‘g‘ri kiritilganini tekshiring (tekshirish uchun /channels buyrug‘ini bosing).",
             parse_mode="HTML"
         )
 

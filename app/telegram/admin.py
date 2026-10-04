@@ -422,11 +422,15 @@ async def handle_publish_callback(callback: CallbackQuery, bot: Bot):
                     pass
                 await callback.message.reply(f"✅ <b>Post #{post_id} kanalga joylandi</b> (Xabar ID: <code>{msg_id}</code>)", parse_mode="HTML")
         else:
+            err_summary = publisher.last_error_summary()
             await callback.answer("❌ Xatolik: Post kanalga yuborilmadi!", show_alert=True)
             if callback.message:
                 await callback.message.reply(
                     f"❌ <b>Post #{post_id} kanalga yuborilmadi!</b>\n\n"
-                    "Iltimos, botning kanalda <b>Admin</b> ekanligini va <code>.env</code> dagi <code>TELEGRAM_CHANNEL_ID</code> to‘g‘riligini tekshiring.",
+                    f"⚠️ <b>Xatolik sababi:</b>\n{err_summary}\n\n"
+                    "💡 <b>Tavsiya:</b>\n"
+                    "1. Botingiz kanalda <b>Admin</b> ekanligi va unga <b>Post Messages</b> (xabar joylash) huquqi berilganini tekshiring.\n"
+                    "2. Kanal ID yoki username <code>.env</code> da to‘g‘ri kiritilganini tekshiring (tekshirish uchun /channels buyrug‘ini bosing).",
                     parse_mode="HTML"
                 )
 

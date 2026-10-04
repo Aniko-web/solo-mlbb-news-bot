@@ -82,9 +82,10 @@ class Settings(BaseSettings):
     @property
     def channel_ids(self) -> List[str]:
         """
-        Return list of configured Telegram channel IDs.
-        Supports single ID ("-1002503816147") or comma/space-separated list ("-1002503816147, -10099887766").
-        Automatically prepends -100 if a positive numeric ID is provided.
+        Return list of configured Telegram channel IDs or usernames.
+        Supports single ID ("-1002503816147"), username ("@murodalievgg"), link ("https://t.me/murodalievgg"),
+        or comma/space-separated list.
+        Automatically normalizes numeric IDs to include the -100 prefix.
         """
         if not self.TELEGRAM_CHANNEL_ID:
             return []
@@ -92,9 +93,23 @@ class Settings(BaseSettings):
         tokens = [t.strip() for t in re.split(r"[,;\s]+", str(self.TELEGRAM_CHANNEL_ID)) if t.strip()]
         result: List[str] = []
         for t in tokens:
-            cid = t
-            if cid.isdigit() and not cid.startswith("-"):
+            cid = t.strip()
+            if not cid:
+                continue
+            # Strip telegram URL prefixes
+            cid = re.sub(r"^https?://t\.me/", "@", cid)
+            cid = re.sub(r"^t\.me/", "@", cid)
+
+            # Check if it is a positive integer
+            if cid.isdigit():
                 cid = f"-100{cid}"
+            elif cid.startswith("-"):
+                digits = cid[1:]
+                if digits.isdigit() and not cid.startswith("-100"):
+                    cid = f"-100{digits}"
+            elif re.match(r"^[a-zA-Z0-9_]{4,}$", cid) and not cid.startswith("@"):
+                cid = f"@{cid}"
+
             if cid not in result:
                 result.append(cid)
         return result

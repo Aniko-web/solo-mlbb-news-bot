@@ -52,3 +52,14 @@ def safe_trim_html(text: str, max_len: int = 1020) -> str:
         chunk += f"</{tag}>"
 
     return chunk
+
+
+def strip_html_tags(text: str) -> str:
+    """Strip all HTML tags to convert to pure plain text for safe fallback."""
+    if not text:
+        return ""
+    s = re.sub(r"<(?:br|p|/p)\s*/?>", "\n", text, flags=re.IGNORECASE)
+    s = re.sub(r"<[^>]+>", "", s)
+    s = s.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", '"').replace("&#39;", "'")
+    return s.strip()
+

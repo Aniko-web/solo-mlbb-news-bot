@@ -153,3 +153,31 @@ async def test_admin_notifier_broadcasts_to_all_admins(monkeypatch):
     assert 2222 in called_chats
 
     await test_engine.dispose()
+
+
+def test_channel_ids_normalization():
+    """Verify channel IDs in various formats (links, handles, missing -100) are normalized correctly."""
+    settings.TELEGRAM_CHANNEL_ID = "https://t.me/testchannel, @another_channel, 2202639176, -10099887766"
+    ch_ids = settings.channel_ids
+    assert "@testchannel" in ch_ids
+    assert "@another_channel" in ch_ids
+    assert "-1002202639176" in ch_ids
+    assert "-10099887766" in ch_ids
+
+
+@pytest.mark.asyncio
+async def test_publisher_last_error_summary():
+    """Verify publisher formats human-readable errors when publish fails."""
+    from app.telegram.publisher import TelegramPublisher
+    mock_bot = MagicMock()
+    pub = TelegramPublisher(bot=mock_bot)
+    pub.last_errors = {
+        "-100123": "Bad Request: chat not found",
+        "-100456": "Forbidden: bot is not a member of the channel chat",
+        "-100789": "Forbidden: bot need administrator rights"
+    }
+    summary = pub.last_error_summary()
+    assert "Kanal topilmadi" in summary
+    assert "a'zo emas" in summary
+    assert "Admin emas" in summary
+

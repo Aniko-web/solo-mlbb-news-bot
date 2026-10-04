@@ -1,3 +1,4 @@
+import os
 import re
 import hashlib
 from typing import Dict, Any, List, Optional
@@ -176,6 +177,19 @@ async def create_patch_post(
 
     content_hash = hashlib.sha256(f"patch_{version}_{server}_{utc_now().strftime('%Y%m%d')}".encode("utf-8")).hexdigest()
 
+    # Save rendered image to disk so it can be loaded during admin approval or later publishing
+    saved_image_path = None
+    if image_bytes:
+        try:
+            os.makedirs("assets/generated", exist_ok=True)
+            clean_srv = server.replace(" ", "_").lower()
+            clean_ver = version.replace(" ", "_").replace(".", "_")
+            saved_image_path = os.path.join("assets", "generated", f"patch_{clean_ver}_{clean_srv}.png")
+            with open(saved_image_path, "wb") as f:
+                f.write(image_bytes)
+        except Exception as save_err:
+            logger.warning(f"Could not persist patch recap image: {save_err}")
+
     async with get_session() as session:
         db_post = await PostRepository.create_post(
             session=session,
@@ -186,7 +200,7 @@ async def create_patch_post(
             status=PostStatus.PUBLISHED.value if publish_to_channel else PostStatus.PENDING.value,
             raw_content=raw_content,
             formatted_post=formatted_post,
-            image_url=None,
+            image_url=saved_image_path,
             reliability_score=100,
             confidence_score=0.99
         )
