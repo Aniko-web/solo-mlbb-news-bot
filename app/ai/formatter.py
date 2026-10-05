@@ -10,7 +10,7 @@ CHANNEL_FOOTER = getattr(
         "💬 Telegram sahifamiz: <a href=\"https://t.me/murodalievgg\">Murodalievgg</a>\n"
         "📹 Instagram sahifamiz: <a href=\"https://instagram.com/murodalievgg\">Murodalievgg</a>\n"
         "📹 Youtube sahifamiz: <a href=\"https://youtube.com/@murodalievgg\">Murodalievgg</a>\n"
-        "😍 Donat Uchun:  <a href=\"https://playdom.uz\">Playdom</a>"
+        "😍 Donat Uchun:  <a href=\"https://t.me/playdomuz_bot\">Playdom</a>"
     )
 )
 
