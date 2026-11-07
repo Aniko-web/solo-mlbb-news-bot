@@ -301,7 +301,8 @@ class PostFormatter:
         week: Optional[Any] = None,
         series: str = "BO3",
         source_url: Optional[str] = None,
-        countdown_str: Optional[str] = None
+        countdown_str: Optional[str] = None,
+        ai_prediction: Optional[Dict[str, Any]] = None
     ) -> str:
         lines = [
             "🇮🇩 <b>MPL ID — KUTILAYOTGAN O‘YIN</b>\n",
@@ -323,10 +324,25 @@ class PostFormatter:
         if info_lines:
             lines.append("\n".join(info_lines) + "\n")
 
+        # AI Prediction Block
+        if ai_prediction:
+            sa = ai_prediction.get("predicted_score_a", 2)
+            sb = ai_prediction.get("predicted_score_b", 1)
+            pa = ai_prediction.get("prob_a", 55)
+            pb = ai_prediction.get("prob_b", 45)
+            comm = ai_prediction.get("commentary_uz", "").strip()
+
+            lines.append("🤖 <b>AI TAHLILI VA TAXMINIY HISOB:</b>")
+            lines.append(f"🎯 <b>Taxminiy hisob:</b> <code>{team_a} {sa} — {sb} {team_b}</code>")
+            lines.append(f"📊 <b>G‘alaba ehtimoli:</b> {team_a} ({pa}%) | {team_b} ({pb}%)")
+            if comm:
+                lines.append(f"🎙 <i>{comm}</i>")
+            lines.append("")
+
         if source_url:
             lines.append(f"🔗 <b>Batafsil:</b> <a href=\"{source_url}\">Liquipedia</a>\n")
 
-        lines.append("#MPLID #MLBB @murodalievgg\n")
+        lines.append("#MPLID #MLBB #AIPrognoz @murodalievgg\n")
         lines.append(CHANNEL_FOOTER)
         return "\n".join(lines)
 
@@ -339,7 +355,8 @@ class PostFormatter:
         week: Optional[Any] = None,
         series: str = "BO3",
         source_url: Optional[str] = None,
-        countdown_str: Optional[str] = None
+        countdown_str: Optional[str] = None,
+        ai_prediction: Optional[Dict[str, Any]] = None
     ) -> str:
         lines = [
             "🇵🇭 <b>MPL PH — KUTILAYOTGAN O‘YIN</b>\n",
@@ -361,10 +378,25 @@ class PostFormatter:
         if info_lines:
             lines.append("\n".join(info_lines) + "\n")
 
+        # AI Prediction Block
+        if ai_prediction:
+            sa = ai_prediction.get("predicted_score_a", 2)
+            sb = ai_prediction.get("predicted_score_b", 1)
+            pa = ai_prediction.get("prob_a", 55)
+            pb = ai_prediction.get("prob_b", 45)
+            comm = ai_prediction.get("commentary_uz", "").strip()
+
+            lines.append("🤖 <b>AI TAHLILI VA TAXMINIY HISOB:</b>")
+            lines.append(f"🎯 <b>Taxminiy hisob:</b> <code>{team_a} {sa} — {sb} {team_b}</code>")
+            lines.append(f"📊 <b>G‘alaba ehtimoli:</b> {team_a} ({pa}%) | {team_b} ({pb}%)")
+            if comm:
+                lines.append(f"🎙 <i>{comm}</i>")
+            lines.append("")
+
         if source_url:
             lines.append(f"🔗 <b>Batafsil:</b> <a href=\"{source_url}\">Liquipedia</a>\n")
 
-        lines.append("#MPLPH #MLBB @murodalievgg\n")
+        lines.append("#MPLPH #MLBB #AIPrognoz @murodalievgg\n")
         lines.append(CHANNEL_FOOTER)
         return "\n".join(lines)
 
@@ -383,6 +415,7 @@ class PostFormatter:
         week = match_data.get("week")
         series = match_data.get("series", "BO3")
         countdown_str = match_data.get("countdown_str")
+        ai_prediction = match_data.get("ai_prediction")
 
         if "PH" in league or "PHILIPPINES" in league:
             return cls.format_mpl_ph_upcoming(
@@ -393,7 +426,8 @@ class PostFormatter:
                 week=week,
                 series=series,
                 source_url=source_url,
-                countdown_str=countdown_str
+                countdown_str=countdown_str,
+                ai_prediction=ai_prediction
             )
         else:
             return cls.format_mpl_id_upcoming(
@@ -404,7 +438,8 @@ class PostFormatter:
                 week=week,
                 series=series,
                 source_url=source_url,
-                countdown_str=countdown_str
+                countdown_str=countdown_str,
+                ai_prediction=ai_prediction
             )
 
     @staticmethod

@@ -208,18 +208,21 @@ class MatchdayService:
 
         # If today has matches, return today's matches
         if today in by_date and by_date[today]:
+            from app.utils.validators import is_match_time_elapsed
             raw_list = by_date.get(today, [])
             formatted_matches: List[Dict[str, Any]] = []
             for i, m in enumerate(raw_list):
+                time_elapsed = is_match_time_elapsed(m.date, m.time, min_elapsed_minutes=40)
+                match_is_finished = time_elapsed and (str(m.status).upper() in ("FINISHED", "FINAL"))
                 formatted_matches.append({
                     "match_num": i + 1,
                     "team_a": m.team_a,
                     "team_b": m.team_b,
                     "time": m.time if ("Toshkent" in m.time or "(UZ)" in m.time) else f"{m.time} (Toshkent)",
                     "series": m.series or "BO3",
-                    "status": m.status.upper(),
-                    "score_a": m.score_a,
-                    "score_b": m.score_b,
+                    "status": "FINISHED" if match_is_finished else "UPCOMING",
+                    "score_a": m.score_a if match_is_finished else None,
+                    "score_b": m.score_b if match_is_finished else None,
                     "is_motd": False
                 })
             return today, formatted_matches, False, None

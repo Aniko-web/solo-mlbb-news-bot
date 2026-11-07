@@ -147,6 +147,22 @@ def render_mpl_ph_upcoming(match_data: Dict[str, Any]) -> bytes:
     draw.rounded_rectangle([px, py, px + pw, py + ph], radius=15, fill=pill_bg, outline=pill_border, width=1)
     draw.text(((W - st_w) // 2, py + 6), status_raw, fill=(248, 250, 252), font=font_status)
 
+    # AI Prediction Pill if available
+    pred_a = match_data.get("predicted_score_a")
+    pred_b = match_data.get("predicted_score_b")
+    if pred_a is None and match_data.get("ai_prediction"):
+        pred_a = match_data["ai_prediction"].get("predicted_score_a")
+        pred_b = match_data["ai_prediction"].get("predicted_score_b")
+
+    if pred_a is not None and pred_b is not None:
+        font_pred = load_font("Arial-Bold.ttf", 15)
+        pred_text = f"🤖 AI TAXMINIY HISOB: {pred_a} — {pred_b}"
+        pt_w, pt_h = get_text_size(draw, pred_text, font_pred)
+        pbw, pbh = pt_w + 36, 30
+        pbx, pby = (W - pbw) // 2, py + ph + 12
+        draw.rounded_rectangle([pbx, pby, pbx + pbw, pby + pbh], radius=15, fill=(26, 16, 45), outline=(168, 85, 247), width=1)
+        draw.text(((W - pt_w) // 2, pby + 6), pred_text, fill=(243, 232, 255), font=font_pred)
+
     # 6. Bottom Metadata
     font_meta = load_font("Arial-Bold.ttf", 15)
     week_val = match_data.get("week")

@@ -13,6 +13,7 @@ from app.utils.validators import (
     PostStatus,
     MatchItem,
     is_fresh_news,
+    is_match_time_elapsed,
     utc_now
 )
 from app.database.database import get_session
@@ -265,9 +266,15 @@ class NewsJobManager:
             season = meta.get("season", "Season 14")
             series = meta.get("series", "BO3")
 
+            # CRITICAL CHECK: Has the match start time actually arrived and elapsed?
+            time_has_elapsed = is_match_time_elapsed(match_date, match_time, min_elapsed_minutes=40)
+
+            # Match can ONLY be officially finished if start time has arrived and at least 40m have elapsed
             is_finished = (
-                raw_status in ["finished", "final"] or
-                (score_a is not None and score_b is not None and (score_a >= 2 or score_b >= 2))
+                time_has_elapsed and (
+                    raw_status in ["finished", "final"] or
+                    (score_a is not None and score_b is not None and (score_a >= 2 or score_b >= 2))
+                )
             )
             match_status = "finished" if is_finished else "upcoming"
 
@@ -295,8 +302,8 @@ class NewsJobManager:
                 time=match_time,
                 season=str(season),
                 week=str(week),
-                score_a=score_a,
-                score_b=score_b,
+                score_a=score_a if is_finished else None,
+                score_b=score_b if is_finished else None,
                 status=match_status,
                 mvp=mvp,
                 series=series,
@@ -310,8 +317,8 @@ class NewsJobManager:
                     "league": league,
                     "team_a": team_a,
                     "team_b": team_b,
-                    "score_a": score_a,
-                    "score_b": score_b,
+                    "score_a": score_a if is_finished else None,
+                    "score_b": score_b if is_finished else None,
                     "status": "FINAL" if match_status == "finished" else "UPCOMING",
                     "mvp": mvp,
                     "date": meta.get("date_display") or match_date,
@@ -323,10 +330,24 @@ class NewsJobManager:
                     "countdown_str": meta.get("countdown_str")
                 }
 
-                # 1. UPCOMING MATCH ANNOUNCEMENT (Schedule Post)
+                # 1. UPCOMING MATCH ANNOUNCEMENT WITH AI PREDICTION (Taxminiy hisob)
                 if match_status == "upcoming" and not getattr(db_match, "upcoming_notified", False):
+                    # AI Analysis & Predicted score before game takes place
+                    ai_pred = await self.analyzer.predict_match(
+                        league=league,
+                        team_a=team_a,
+                        team_b=team_b,
+                        season=str(season),
+                        week=str(week),
+                        series=str(series)
+                    )
+                    match_dict["ai_prediction"] = ai_pred
+                    match_dict["predicted_score_a"] = ai_pred.get("predicted_score_a")
+                    match_dict["predicted_score_b"] = ai_pred.get("predicted_score_b")
+
                     image_bytes = render_match_upcoming(match_dict)
                     formatted_post = PostFormatter.format_match_upcoming_from_data(match_dict, source_url=item.source_url)
+                    pred_title = f"{ai_pred.get('predicted_score_a')}-{ai_pred.get('predicted_score_b')}"
                     content_hash = generate_content_hash(
                         title=f"UPCOMING:{league}:{team_a}vs{team_b}:{match_date}",
                         content=formatted_post,
@@ -345,7 +366,7 @@ class NewsJobManager:
                         db_post = await PostRepository.create_post(
                             session=session,
                             source_url=item.source_url,
-                            title=f"Kutilayotgan o'yin: {team_a} vs {team_b}",
+                            title=f"Kutilayotgan o'yin: {team_a} vs {team_b} (AI taxmini: {pred_title})",
                             category="MPL_ID" if "ID" in league else "MPL_PH",
                             content_hash=content_hash,
                             status=PostStatus.PENDING.value,
@@ -371,10 +392,10 @@ class NewsJobManager:
                             )
 
                     await MatchRepository.mark_upcoming_notified(session, db_match.id)
-                    logger.info(f"[{league}] Sent UPCOMING match announcement: {team_a} vs {team_b}")
+                    logger.info(f"[{league}] Sent UPCOMING match announcement with AI prediction ({pred_title}): {team_a} vs {team_b}")
                     processed_count += 1
 
-                # 2. MATCH RESULT (Result Post)
+                # 2. MATCH RESULT (Result Post) - only once match is genuinely finished
                 elif match_status == "finished" and not getattr(db_match, "result_notified", False):
                     image_bytes = render_match_result(match_dict)
                     formatted_post = PostFormatter.format_match_result_from_data(match_dict, source_url=item.source_url)

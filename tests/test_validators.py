@@ -42,3 +42,30 @@ def test_verify_no_source_no_claim_hallucination_prevention():
     assert verified["hero"] == "Lunox"
     assert verified["skin_name"] == "Astral Echo"
     assert verified["price"] == "Unknown"  # Sanitized to Unknown!
+
+
+def test_is_match_time_elapsed_future_match():
+    from app.utils.validators import is_match_time_elapsed, parse_match_datetime_uz, TASHKENT_TZ
+    from datetime import datetime, timedelta
+
+    # Match tomorrow in Tashkent time
+    tomorrow = datetime.now(TASHKENT_TZ) + timedelta(days=1)
+    tomorrow_date = tomorrow.strftime("%Y-%m-%d")
+
+    # Match time in the future must return False (not elapsed)
+    assert not is_match_time_elapsed(tomorrow_date, "15:00 (UZ)")
+    assert not is_match_time_elapsed(tomorrow_date, "17:00 PHT")
+
+
+def test_is_match_time_elapsed_past_match():
+    from app.utils.validators import is_match_time_elapsed, TASHKENT_TZ
+    from datetime import datetime, timedelta
+
+    # Match yesterday in Tashkent time
+    yesterday = datetime.now(TASHKENT_TZ) - timedelta(days=1)
+    yesterday_date = yesterday.strftime("%Y-%m-%d")
+
+    # Past match must return True
+    assert is_match_time_elapsed(yesterday_date, "13:00 (UZ)")
+    assert is_match_time_elapsed(yesterday_date, "15:00 WIB")
+

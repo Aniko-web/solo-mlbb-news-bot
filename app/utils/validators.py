@@ -10,6 +10,67 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
+TASHKENT_TZ = timezone(timedelta(hours=5))
+
+
+def parse_match_datetime_uz(match_date: str, match_time: Optional[str] = None) -> Optional[datetime]:
+    """
+    Parse match date (YYYY-MM-DD) and time string into a Tashkent timezone-aware datetime.
+    Supports '(UZ)', '(WIB)', '(PHT)', '15:00', etc.
+    """
+    if not match_date or match_date == "TBD":
+        return None
+    try:
+        dt_base = datetime.strptime(match_date, "%Y-%m-%d")
+    except Exception:
+        return None
+
+    raw_time = (match_time or "15:00").strip()
+    h, m = 15, 0
+
+    m_uz = re.search(r"(\d{1,2}):(\d{2})\s*\(UZ\)", raw_time, re.IGNORECASE)
+    if m_uz:
+        h, m = int(m_uz.group(1)), int(m_uz.group(2))
+    elif "WIB" in raw_time.upper():
+        # WIB is UTC+7 -> Tashkent is UTC+5 (-2 hours)
+        m_wib = re.search(r"(\d{1,2}):(\d{2})", raw_time)
+        if m_wib:
+            wib_h, m = int(m_wib.group(1)), int(m_wib.group(2))
+            h = (wib_h - 2) % 24
+    elif "PHT" in raw_time.upper():
+        # PHT is UTC+8 -> Tashkent is UTC+5 (-3 hours)
+        m_pht = re.search(r"(\d{1,2}):(\d{2})", raw_time)
+        if m_pht:
+            pht_h, m = int(m_pht.group(1)), int(m_pht.group(2))
+            h = (pht_h - 3) % 24
+    else:
+        m_plain = re.search(r"(\d{1,2}):(\d{2})", raw_time)
+        if m_plain:
+            h, m = int(m_plain.group(1)), int(m_plain.group(2))
+
+    return datetime(dt_base.year, dt_base.month, dt_base.day, h, m, tzinfo=TASHKENT_TZ)
+
+
+def is_match_time_elapsed(
+    match_date: str,
+    match_time: Optional[str] = None,
+    min_elapsed_minutes: int = 40
+) -> bool:
+    """
+    Returns True ONLY IF the match start time has already passed and at least
+    min_elapsed_minutes (e.g. 40 mins for BO3) have elapsed in Tashkent time.
+    If the match is scheduled in the future or is just starting, returns False.
+    """
+    match_dt = parse_match_datetime_uz(match_date, match_time)
+    if not match_dt:
+        return True
+
+    now_uz = datetime.now(TASHKENT_TZ)
+    diff_sec = (now_uz - match_dt).total_seconds()
+    return diff_sec >= (min_elapsed_minutes * 60)
+
+
+
 class CategoryEnum(str, Enum):
     NEWS = "NEWS"
     PATCH = "PATCH"

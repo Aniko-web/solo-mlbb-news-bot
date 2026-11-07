@@ -138,6 +138,22 @@ def render_mpl_id_upcoming(match_data: Dict[str, Any]) -> bytes:
     draw.rounded_rectangle([bx, by, bx + bw, by + bh], radius=6, fill=badge_bg, outline=badge_border, width=1)
     draw.text(((W - st_w) // 2, by + 6), status_raw, fill=(241, 245, 249), font=font_status)
 
+    # AI Prediction Pill if available
+    pred_a = match_data.get("predicted_score_a")
+    pred_b = match_data.get("predicted_score_b")
+    if pred_a is None and match_data.get("ai_prediction"):
+        pred_a = match_data["ai_prediction"].get("predicted_score_a")
+        pred_b = match_data["ai_prediction"].get("predicted_score_b")
+
+    if pred_a is not None and pred_b is not None:
+        font_pred = load_font("Arial-Bold.ttf", 15)
+        pred_text = f"🤖 AI TAXMINIY HISOB: {pred_a} — {pred_b}"
+        pt_w, pt_h = get_text_size(draw, pred_text, font_pred)
+        pbw, pbh = pt_w + 36, 30
+        pbx, pby = (W - pbw) // 2, by + bh + 12
+        draw.rounded_rectangle([pbx, pby, pbx + pbw, pby + pbh], radius=6, fill=(26, 16, 45), outline=(168, 85, 247), width=1)
+        draw.text(((W - pt_w) // 2, pby + 6), pred_text, fill=(243, 232, 255), font=font_pred)
+
     # 5. Bottom Metadata
     draw.line([(50, H - 75), (W - 50, H - 75)], fill=(40, 45, 58), width=2)
     draw.line([(W - 320, H - 75), (W - 50, H - 75)], fill=(220, 38, 38), width=3)

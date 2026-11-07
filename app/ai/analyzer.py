@@ -364,3 +364,132 @@ class AIAnalyzer:
             key_points=points,
             source_url=item.source_url
         )
+
+    TEAM_POWER_RATINGS: Dict[str, int] = {
+        # MPL ID
+        "ONIC ID": 95,
+        "RRQ HOSHI": 91,
+        "TEAM LIQUID ID": 89,
+        "BIGETRON ALPHA": 88,
+        "GEEK FAM": 82,
+        "ALTER EGO": 80,
+        "EVOS GLORY": 79,
+        "DEWA UNITED": 75,
+        "REBELLION ESPORTS": 72,
+        # MPL PH
+        "AP.BREN": 96,
+        "ONIC PH": 94,
+        "TEAM LIQUID PH": 91,
+        "TEAM FALCONS": 90,
+        "AURORA GAMING": 86,
+        "SMART OMEGA": 82,
+        "BLACKLIST INT.": 80,
+        "TWISTED MINDS": 78,
+        "TNC PRO TEAM": 75,
+    }
+
+    async def predict_match(
+        self,
+        league: str,
+        team_a: str,
+        team_b: str,
+        season: str = "Season 14",
+        week: str = "1",
+        series: str = "BO3"
+    ) -> Dict[str, Any]:
+        """
+        Generates AI-powered match prediction, win probabilities, and PREDICTED SCORE (Taxminiy hisob)
+        for upcoming matches before they take place.
+        """
+        if self.client:
+            try:
+                system_prompt = (
+                    "Sen Mobile Legends: Bang Bang (MLBB) bo'yicha professional tahlilchisan.\n"
+                    "VAZIFA: Bo'lib o'tadigan o'yin uchun AI TAXMINIY HISOB (Prediction), g'alaba ehtimoli va o'zbekcha qisqa sharh tayyorla.\n"
+                    "QAT'IY QOIDALAR:\n"
+                    "1. BO3 seriyasi uchun taxminiy hisob faqat 2-0, 2-1, 1-2 yoki 0-2 bo'lishi shart.\n"
+                    "2. G'alaba ehtimolini foizda ko'rsat (prob_a + prob_b = 100).\n"
+                    "3. commentary_uz: 1-2 ta qisqa va qiziqarli o'zbekcha jumla (draft, o'yin sur'ati, jamoaviy harakatlar haqida).\n"
+                    "4. Faqat quyidagi JSON formatida javob ber:\n"
+                    "{\n"
+                    '  "predicted_score_a": 2,\n'
+                    '  "predicted_score_b": 1,\n'
+                    '  "prob_a": 60,\n'
+                    '  "prob_b": 40,\n'
+                    '  "commentary_uz": "..."\n'
+                    "}"
+                )
+                user_prompt = f"Musobaqa: {league} ({season}, {week})\nJamoalar: {team_a} vs {team_b} [{series}]"
+                response = await self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    temperature=0.7,
+                    max_tokens=180
+                )
+                raw_text = response.choices[0].message.content.strip()
+                if "```json" in raw_text:
+                    raw_text = raw_text.split("```json")[1].split("```")[0].strip()
+                elif "```" in raw_text:
+                    raw_text = raw_text.split("```")[1].split("```")[0].strip()
+
+                parsed = json.loads(raw_text)
+                sa = int(parsed.get("predicted_score_a", 2))
+                sb = int(parsed.get("predicted_score_b", 1))
+                pa = int(parsed.get("prob_a", 55))
+                pb = int(parsed.get("prob_b", 45))
+                comm = str(parsed.get("commentary_uz", "")).strip()
+                if not comm:
+                    fav = team_a if sa > sb else team_b
+                    comm = f"{fav} ushbu bahsda jamoaviy o'yin va draft ustunligi evaziga g'alaba qozonishi kutilmoqda."
+                return {
+                    "predicted_score_a": sa,
+                    "predicted_score_b": sb,
+                    "prob_a": pa,
+                    "prob_b": pb,
+                    "commentary_uz": comm
+                }
+            except Exception as e:
+                logger.warning(f"AI match prediction via LLM failed, using deterministic rating model: {e}")
+
+        # Deterministic fallback model
+        clean_a = team_a.upper().strip()
+        clean_b = team_b.upper().strip()
+        r_a = self.TEAM_POWER_RATINGS.get(clean_a, 80)
+        r_b = self.TEAM_POWER_RATINGS.get(clean_b, 80)
+        diff = r_a - r_b
+
+        if diff >= 12:
+            sa, sb, pa, pb = 2, 0, 72, 28
+        elif diff >= 4:
+            sa, sb, pa, pb = 2, 1, 58, 42
+        elif -3 <= diff <= 3:
+            sa, sb, pa, pb = 2, 1, 53, 47
+        elif diff <= -12:
+            sa, sb, pa, pb = 0, 2, 28, 72
+        else:
+            sa, sb, pa, pb = 1, 2, 42, 58
+
+        fav = team_a if sa > sb else team_b
+        und = team_b if sa > sb else team_a
+
+        if ("ONIC" in clean_a or "ONIC" in clean_b) and ("RRQ" in clean_a or "RRQ" in clean_b):
+            comm = f"Klassik Royal Derby! Har ikki gigant yuqori formada, biroq {fav}ning so'nggi patchdagi barqarorligi sababli 2-1 hisobida g'alaba qozonishi kutilmoqda."
+        elif abs(diff) <= 3:
+            comm = f"Teng kuchlilar to'qnashuvi! {und} kamida bitta xaritani ilib ketishi aniq, biroq hal qiluvchi xaritada {fav} tajriba evaziga ustun kelishi taxmin qilinmoqda."
+        elif sa == 2 and sb == 0:
+            comm = f"{fav} hozirgi metada yuqori bosim o'tkazmoqda va {und}ga imkoniyat qoldirmasdan 2-0 hisobida g'alaba qozonishi ehtimoli yuqori."
+        elif sa == 0 and sb == 2:
+            comm = f"{fav} hozirgi metada yuqori bosim o'tkazmoqda va {und}ga imkoniyat qoldirmasdan 2-0 hisobida g'alaba qozonishi ehtimoli yuqori."
+        else:
+            comm = f"Shiddatli jang kutilmoqda! {fav} draft afzalligi va yaxshiroq rotatsiya evaziga 2-1 hisobida g'alaba qozonishi kutilmoqda."
+
+        return {
+            "predicted_score_a": sa,
+            "predicted_score_b": sb,
+            "prob_a": pa,
+            "prob_b": pb,
+            "commentary_uz": comm
+        }
