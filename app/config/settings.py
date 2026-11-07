@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     ADMIN_TELEGRAM_ID: str = ""  # Single ID or list: "123456, 789101, 555555"
     ADMIN_TELEGRAM_IDS: str = "" # Multi-admin alias
     CHANNEL_FOOTER: str = (
-        "💬 Telegram sahifamiz: <a href=\"https://t.me/murodalievgg\">Murodalievgg</a>\n"
+        "<tg-emoji emoji-id=\"5251489485283140234\">✈️</tg-emoji> Telegram sahifamiz: <a href=\"https://t.me/murodalievgg\">Murodalievgg</a>\n"
         "📹 Instagram sahifamiz: <a href=\"https://instagram.com/murodalievgg\">Murodalievgg</a>\n"
         "📹 Youtube sahifamiz: <a href=\"https://youtube.com/@murodalievgg\">Murodalievgg</a>\n"
         "😍 Donat Uchun:  <a href=\"https://t.me/playdomuz_bot\">Playdom</a>"
