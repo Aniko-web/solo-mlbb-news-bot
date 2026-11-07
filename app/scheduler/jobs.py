@@ -381,7 +381,8 @@ class NewsJobManager:
                             await self.publisher.publish_post(
                                 post_id=db_post.id,
                                 formatted_text=formatted_post,
-                                image_bytes=image_bytes
+                                image_bytes=image_bytes,
+                                poll_data={"team_a": team_a, "team_b": team_b, "series": series}
                             )
                         else:
                             await self.admin_notifier.send_approval_request(
@@ -432,7 +433,8 @@ class NewsJobManager:
                             await self.publisher.publish_post(
                                 post_id=db_post.id,
                                 formatted_text=formatted_post,
-                                image_bytes=image_bytes
+                                image_bytes=image_bytes,
+                                poll_data={"team_a": team_a, "team_b": team_b, "series": series}
                             )
                         else:
                             await self.admin_notifier.send_approval_request(
@@ -590,6 +592,72 @@ class NewsJobManager:
 
     async def job_esports(self) -> int:
         return await self.process_news_collector(self.esports_collector, "Esports", max_items=settings.MAX_DAILY_NEWS_COUNT)
+
+    async def job_meta_tier_update(self) -> int:
+        """
+        Scheduled Meta Tier update from mlbb.io:
+        Analyzes Strong & Spammed, Traps to Avoid, and Hidden Gems.
+        """
+        if STATE.get("is_paused", False):
+            return 0
+        logger.info("=== Checking Meta Tier Update (mlbb.io) ===")
+        try:
+            from app.services.meta_tier_service import MetaTierService
+            import time
+            res = await MetaTierService.generate_meta_tier_post()
+            if not res.get("success"):
+                return 0
+
+            caption = res["formatted_post"]
+            img_bytes = res["image_bytes"]
+            content_hash = generate_content_hash("META_TIER_LIST", caption + str(int(time.time() / 86400)))
+
+            async with get_session() as session:
+                if await PostRepository.exists_by_hash(session, content_hash):
+                    logger.info("Meta tier post for today already exists, skipping.")
+                    return 0
+
+                card_path = None
+                if img_bytes:
+                    generated_dir = os.path.join(os.getcwd(), "assets", "generated")
+                    os.makedirs(generated_dir, exist_ok=True)
+                    card_path = os.path.join(generated_dir, f"meta_tier_{int(time.time())}.png")
+                    with open(card_path, "wb") as f:
+                        f.write(img_bytes)
+
+                status = PostStatus.PUBLISHED.value if settings.AUTO_PUBLISH else PostStatus.PENDING.value
+                db_post = await PostRepository.create_post(
+                    session=session,
+                    source_url="https://mlbb.io/en/hero-tier",
+                    title="Mobile Legends Meta Hero Tier List (mlbb.io)",
+                    category="META",
+                    content_hash=content_hash,
+                    status=status,
+                    raw_content="MLBB Hero Tier List from mlbb.io",
+                    formatted_post=caption,
+                    image_url=card_path,
+                    reliability_score=100,
+                    confidence_score=1.0,
+                    published_at=datetime.utcnow() if settings.AUTO_PUBLISH else None
+                )
+
+                if settings.AUTO_PUBLISH:
+                    await self.publisher.publish_post(
+                        post_id=db_post.id,
+                        formatted_text=caption,
+                        image_bytes=img_bytes
+                    )
+                else:
+                    await self.admin_notifier.send_approval_request(
+                        post_id=db_post.id,
+                        category="META TIER LIST",
+                        formatted_post=caption,
+                        image_bytes=img_bytes
+                    )
+            return 1
+        except Exception as e:
+            logger.error(f"Error in job_meta_tier_update: {e}", exc_info=True)
+            return 0
 
     async def job_mlbb_fun_content(self) -> int:
         """
@@ -783,6 +851,16 @@ class NewsJobManager:
             next_run_time=datetime.now()
         )
         logger.info(f"Pending approval timeout monitor scheduled (every 1 minute, timeout: {settings.APPROVAL_TIMEOUT_MINUTES}m).")
+
+        # 6. MLBB Meta Hero Tier List Schedule (every 3 days)
+        self.scheduler.add_job(
+            self.job_meta_tier_update,
+            "interval",
+            days=3,
+            id="mlbb_meta_tier_job",
+            replace_existing=True
+        )
+        logger.info("MLBB Meta Hero Tier List (mlbb.io) scheduled every 3 days.")
 
         self.scheduler.start()
         logger.info("APScheduler initialized and started successfully.")

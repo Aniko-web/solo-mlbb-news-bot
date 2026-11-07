@@ -385,6 +385,128 @@ async def cmd_fast_patch(message: Message, bot: Bot):
         await message.reply(f"❌ Xatolik yuz berdi: {e}")
 
 
+@admin_router.message(Command("meta"))
+async def cmd_meta_post(message: Message, bot: Bot):
+    user_id = message.from_user.id if message.from_user else 0
+    if not await is_authorized_admin(user_id):
+        await message.reply("Ruxsat berilmagan.")
+        return
+
+    await message.reply("⏳ <i>mlbb.io dan Meta Tier ma'lumotlari yuklanmoqda va infografika chizilmoqda...</i>", parse_mode="HTML")
+
+    from app.services.meta_tier_service import MetaTierService
+    res = await MetaTierService.generate_meta_tier_post()
+    if not res.get("success"):
+        await message.reply("❌ Meta ma'lumotlarini yuklashda xatolik yuz berdi.")
+        return
+
+    import time
+    from app.database.database import get_session
+    from app.database.repositories import PostRepository
+    from app.utils.hashing import generate_content_hash
+    from app.utils.validators import PostStatus
+
+    caption = res["formatted_post"]
+    img_bytes = res["image_bytes"]
+    content_hash = generate_content_hash("META_TIER_LIST", caption + str(int(time.time() / 86400)))
+
+    card_path = None
+    if img_bytes:
+        generated_dir = os.path.join(os.getcwd(), "assets", "generated")
+        os.makedirs(generated_dir, exist_ok=True)
+        card_path = os.path.join(generated_dir, f"meta_tier_{int(time.time())}.png")
+        with open(card_path, "wb") as f:
+            f.write(img_bytes)
+
+    async with get_session() as session:
+        db_post = await PostRepository.create_post(
+            session=session,
+            source_url="https://mlbb.io/en/hero-tier",
+            title="Mobile Legends Meta Hero Tier List (mlbb.io)",
+            category="META",
+            content_hash=content_hash,
+            status=PostStatus.PENDING.value,
+            raw_content="MLBB Hero Tier List from mlbb.io",
+            formatted_post=caption,
+            image_url=card_path,
+            reliability_score=100,
+            confidence_score=1.0
+        )
+        post_id = db_post.id
+
+    notifier = AdminNotifier(bot=bot)
+    await notifier.send_approval_request(
+        post_id=post_id,
+        category="META TIER LIST",
+        formatted_post=caption,
+        image_bytes=img_bytes
+    )
+    await message.reply(f"✅ <b>Meta Tier List #{post_id} tayyorlandi!</b> Yuqoridagi preview orqali tasdiqlab kanalga chiqarishingiz mumkin.", parse_mode="HTML")
+
+
+@admin_router.message(Command("fastmeta"))
+async def cmd_fast_meta_post(message: Message, bot: Bot):
+    user_id = message.from_user.id if message.from_user else 0
+    if not await is_authorized_admin(user_id):
+        await message.reply("Ruxsat berilmagan.")
+        return
+
+    await message.reply("🚀 <i>mlbb.io Meta Tier posti to‘g‘ridan-to‘g‘ri kanalga chiqarilmoqda...</i>", parse_mode="HTML")
+
+    from app.services.meta_tier_service import MetaTierService
+    res = await MetaTierService.generate_meta_tier_post()
+    if not res.get("success"):
+        await message.reply("❌ Meta ma'lumotlarini yuklashda xatolik yuz berdi.")
+        return
+
+    import time
+    from app.database.database import get_session
+    from app.database.repositories import PostRepository
+    from app.utils.hashing import generate_content_hash
+    from app.utils.validators import PostStatus
+    from app.telegram.publisher import TelegramPublisher
+
+    caption = res["formatted_post"]
+    img_bytes = res["image_bytes"]
+    content_hash = generate_content_hash("META_TIER_LIST", caption + str(int(time.time() / 86400)))
+
+    card_path = None
+    if img_bytes:
+        generated_dir = os.path.join(os.getcwd(), "assets", "generated")
+        os.makedirs(generated_dir, exist_ok=True)
+        card_path = os.path.join(generated_dir, f"meta_tier_{int(time.time())}.png")
+        with open(card_path, "wb") as f:
+            f.write(img_bytes)
+
+    async with get_session() as session:
+        db_post = await PostRepository.create_post(
+            session=session,
+            source_url="https://mlbb.io/en/hero-tier",
+            title="Mobile Legends Meta Hero Tier List (mlbb.io)",
+            category="META",
+            content_hash=content_hash,
+            status=PostStatus.PENDING.value,
+            raw_content="MLBB Hero Tier List from mlbb.io",
+            formatted_post=caption,
+            image_url=card_path,
+            reliability_score=100,
+            confidence_score=1.0
+        )
+        post_id = db_post.id
+
+    publisher = TelegramPublisher(bot=bot)
+    msg_id = await publisher.publish_post(
+        post_id=post_id,
+        formatted_text=caption,
+        image_bytes=img_bytes
+    )
+    if msg_id:
+        await message.reply(f"🎉 <b>Meta Tier List post #{post_id} muvaffaqiyatli kanalga chop etildi!</b> (Msg ID: <code>{msg_id}</code>)", parse_mode="HTML")
+    else:
+        await message.reply("❌ Post kanalga yuborilmadi, xatolik yuz berdi.")
+
+
+
 
 @admin_router.callback_query(F.data.startswith("publish:"))
 async def handle_publish_callback(callback: CallbackQuery, bot: Bot):
@@ -407,10 +529,24 @@ async def handle_publish_callback(callback: CallbackQuery, bot: Bot):
         # Publish to channel
         from app.telegram.publisher import TelegramPublisher
         publisher = TelegramPublisher(bot=bot)
+
+        poll_data = None
+        title_lower = (post.title or "").lower()
+        if "kutilayotgan o'yin" in title_lower or "vs" in title_lower:
+            import re
+            m = re.search(r"(?:kutilayotgan o'yin:\s*)?([^v\(\n]+)\s+vs\s+([^\(\n]+)", post.title or "", re.IGNORECASE)
+            if m:
+                poll_data = {
+                    "team_a": m.group(1).strip(),
+                    "team_b": m.group(2).strip(),
+                    "series": "BO3"
+                }
+
         msg_id = await publisher.publish_post(
             post_id=post.id,
             formatted_text=post.formatted_post or post.title,
-            image_url=post.image_url
+            image_url=post.image_url,
+            poll_data=poll_data
         )
 
         if msg_id:

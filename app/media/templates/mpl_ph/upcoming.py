@@ -147,21 +147,47 @@ def render_mpl_ph_upcoming(match_data: Dict[str, Any]) -> bytes:
     draw.rounded_rectangle([px, py, px + pw, py + ph], radius=15, fill=pill_bg, outline=pill_border, width=1)
     draw.text(((W - st_w) // 2, py + 6), status_raw, fill=(248, 250, 252), font=font_status)
 
-    # AI Prediction Pill if available
+    # AI Prediction Pill & Cyberpunk Win-Rate Bar if available
     pred_a = match_data.get("predicted_score_a")
     pred_b = match_data.get("predicted_score_b")
-    if pred_a is None and match_data.get("ai_prediction"):
-        pred_a = match_data["ai_prediction"].get("predicted_score_a")
-        pred_b = match_data["ai_prediction"].get("predicted_score_b")
+    prob_a = 50
+    prob_b = 50
+    if match_data.get("ai_prediction"):
+        if pred_a is None:
+            pred_a = match_data["ai_prediction"].get("predicted_score_a")
+            pred_b = match_data["ai_prediction"].get("predicted_score_b")
+        prob_a = match_data["ai_prediction"].get("prob_a", 50)
+        prob_b = match_data["ai_prediction"].get("prob_b", 50)
 
     if pred_a is not None and pred_b is not None:
-        font_pred = load_font("Arial-Bold.ttf", 15)
-        pred_text = f"🤖 AI TAXMINIY HISOB: {pred_a} — {pred_b}"
+        font_pred = load_font("Impact.ttf", 18)
+        pred_text = f"AI PREDICTED: {pred_a} — {pred_b}"
         pt_w, pt_h = get_text_size(draw, pred_text, font_pred)
-        pbw, pbh = pt_w + 36, 30
+        pbw, pbh = pt_w + 44, 34
         pbx, pby = (W - pbw) // 2, py + ph + 12
-        draw.rounded_rectangle([pbx, pby, pbx + pbw, pby + pbh], radius=15, fill=(26, 16, 45), outline=(168, 85, 247), width=1)
-        draw.text(((W - pt_w) // 2, pby + 6), pred_text, fill=(243, 232, 255), font=font_pred)
+        # Neon violet capsule
+        draw.rounded_rectangle([pbx, pby, pbx + pbw, pby + pbh], radius=17, fill=(30, 14, 52), outline=(192, 132, 252), width=2)
+        draw.text(((W - pt_w) // 2, pby + 8), pred_text, fill=(245, 235, 255), font=font_pred)
+
+        # Neon Cyan / Solar Gold Win-Rate Progress Bar
+        bar_w = 340
+        bar_h = 10
+        bar_x = (W - bar_w) // 2
+        bar_y = pby + pbh + 14
+
+        draw.rounded_rectangle([bar_x - 1, bar_y - 1, bar_x + bar_w + 1, bar_y + bar_h + 1], radius=5, fill=(10, 20, 38), outline=(20, 50, 85), width=1)
+        split_w = int(bar_w * (prob_a / 100.0))
+        if split_w > 0:
+            draw.rounded_rectangle([bar_x, bar_y, bar_x + split_w, bar_y + bar_h], radius=4, fill=(14, 165, 233))
+        if split_w < bar_w:
+            draw.rounded_rectangle([bar_x + split_w, bar_y, bar_x + bar_w, bar_y + bar_h], radius=4, fill=(245, 158, 11))
+
+        font_pct = load_font("Arial-Bold.ttf", 13)
+        pct_a_str = f"{team_a[:10]} {prob_a}%"
+        pct_b_str = f"{prob_b}% {team_b[:10]}"
+        ta_str_w, _ = get_text_size(draw, pct_a_str, font_pct)
+        draw.text((bar_x - 12 - ta_str_w, bar_y - 2), pct_a_str, fill=(56, 189, 248), font=font_pct)
+        draw.text((bar_x + bar_w + 12, bar_y - 2), pct_b_str, fill=(253, 224, 71), font=font_pct)
 
     # 6. Bottom Metadata
     font_meta = load_font("Arial-Bold.ttf", 15)

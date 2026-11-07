@@ -81,6 +81,8 @@ async def cmd_start(message: Message):
             "/today_ph — MPL PH bugungi matchday kartasi va AI tahlili\n"
             "/mpl_id — Liquipedia rasmiy MPL ID jadvali va kartasi\n"
             "/mpl_ph — Liquipedia rasmiy MPL PH jadvali va kartasi\n"
+            "/meta — mlbb.io dan Meta Tier (Strong, Traps, Gems) postini yaratish\n"
+            "/fastmeta — Meta Tier postini darhol kanalga chiqarish\n"
             "/pause — Avtomatik yangilik yig‘ishni to‘xtatish\n"
             "/resume — Yangilik yig‘ishni davom ettirish\n"
             "/send &lt;id&gt; — Postni kanalga chiqarish\n"

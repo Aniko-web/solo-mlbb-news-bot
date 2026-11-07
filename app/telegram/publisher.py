@@ -91,10 +91,12 @@ class TelegramPublisher:
         post_id: int,
         formatted_text: str,
         image_bytes: Optional[bytes] = None,
-        image_url: Optional[str] = None
+        image_url: Optional[str] = None,
+        poll_data: Optional[dict] = None
     ) -> Optional[int]:
         """
         Publish post to all configured Telegram channels with photo attachment.
+        Optional poll_data dict ({team_a: str, team_b: str, series: str}) sends an attached prediction poll.
         Returns telegram message ID if successful, or None if failed.
         """
         self.last_errors = {}
@@ -233,6 +235,28 @@ class TelegramPublisher:
                             first_msg_id = sent_msg.message_id
                         logger.info(f"Post #{post_id} published successfully to channel {cid} (msg_id: {sent_msg.message_id})")
 
+                        # If poll_data is attached (e.g. for upcoming matches), send match prediction poll
+                        if poll_data and "team_a" in poll_data and "team_b" in poll_data:
+                            try:
+                                ta = poll_data["team_a"]
+                                tb = poll_data["team_b"]
+                                s_type = poll_data.get("series", "BO3")
+                                poll_question = f"⚔️ Sizningcha kim g‘alaba qozonadi? [{s_type}]"
+                                poll_opts = [
+                                    f"👑 {ta}",
+                                    f"⚔️ {tb}"
+                                ]
+                                await self.bot.send_poll(
+                                    chat_id=cid,
+                                    question=poll_question,
+                                    options=poll_opts,
+                                    is_anonymous=True,
+                                    allows_multiple_answers=False
+                                )
+                                logger.info(f"[{cid}] Match prediction poll sent for {ta} vs {tb}")
+                            except Exception as poll_err:
+                                logger.warning(f"[{cid}] Failed to send match prediction poll: {poll_err}")
+
                 except Exception as ch_err:
                     self.last_errors[cid] = str(ch_err)
                     logger.error(f"Failed to publish post #{post_id} to channel {cid}: {ch_err}")
@@ -253,4 +277,29 @@ class TelegramPublisher:
             logger.error(f"Failed to publish post #{post_id} to Telegram channels: {e}")
             self.last_errors["global"] = str(e)
             return None
+
+    async def send_match_poll(
+        self,
+        team_a: str,
+        team_b: str,
+        series: str = "BO3"
+    ) -> list[int]:
+        """Send standalone match prediction poll to all configured channels."""
+        channel_ids = await get_effective_channel_ids()
+        poll_msg_ids = []
+        if not self.bot or not channel_ids:
+            return []
+        for cid in channel_ids:
+            try:
+                msg = await self.bot.send_poll(
+                    chat_id=cid,
+                    question=f"⚔️ Sizningcha kim g‘alaba qozonadi? [{series}]",
+                    options=[f"👑 {team_a}", f"⚔️ {team_b}"],
+                    is_anonymous=True,
+                    allows_multiple_answers=False
+                )
+                poll_msg_ids.append(msg.message_id)
+            except Exception as e:
+                logger.warning(f"Failed to send standalone poll to {cid}: {e}")
+        return poll_msg_ids
 
