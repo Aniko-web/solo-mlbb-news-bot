@@ -8,7 +8,7 @@ CHANNEL_FOOTER = getattr(
     "CHANNEL_FOOTER",
     (
         "<tg-emoji emoji-id=\"5251489485283140234\">✈️</tg-emoji> Telegram sahifamiz: <a href=\"https://t.me/murodalievgg\">Murodalievgg</a>\n"
-        "📹 Instagram sahifamiz: <a href=\"https://instagram.com/murodalievgg\">Murodalievgg</a>\n"
+        "<tg-emoji emoji-id=\"5348533850429470257\">🌐</tg-emoji> Instagram sahifamiz: <a href=\"https://instagram.com/murodalievgg\">Murodalievgg</a>\n"
         "<tg-emoji emoji-id=\"5422837510499739688\">▶️</tg-emoji> Youtube sahifamiz: <a href=\"https://youtube.com/@murodalievgg\">Murodalievgg</a>\n"
         "<tg-emoji emoji-id=\"5427168083074628963\">💎</tg-emoji> Donat Uchun:  <a href=\"https://t.me/playdomuz_bot\">Playdom</a>"
     )
