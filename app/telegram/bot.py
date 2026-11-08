@@ -61,38 +61,57 @@ async def cmd_start(message: Message):
     text = (
         "👋 <b>Assalomu alaykum! MLBB News AI Agent botiga xush kelibsiz!</b>\n\n"
         "Men Mobile Legends: Bang Bang bo‘yicha rasmiy yangiliklar, patch notes, "
-        "qahramonlar balansi, yangi skinlar va MPL ID/PH o‘yin natijalarini kuzatib boruvchi AI agentman.\n\n"
+        "qahramonlar balansi, yangi skinlar va MPL ID/PH/MY o‘yin natijalarini kuzatib boruvchi AI agentman.\n\n"
         f"🆔 <b>Sizning Telegram ID:</b> <code>{user_id}</code>\n\n"
         "📌 <b>Asosiy buyruqlar:</b>\n"
         "/status — Tizim holatini ko‘rish\n"
         "/latest — So‘nggi yangiliklar\n"
         "/test — Test xabarni tekshirish\n"
     )
+    reply_markup = None
     if is_adm:
+        from app.telegram.keyboards import get_admin_reply_keyboard
+        reply_markup = get_admin_reply_keyboard()
         text += (
-            "\n👑 <b>Admin buyruqlari:</b>\n"
-            "/admins — Barcha administratorlar ro‘yxati\n"
-            "/addadmin &lt;id&gt; — Yangi admin qo‘shish\n"
-            "/deladmin &lt;id&gt; — Adminni o‘chirish\n"
-            "/newpatch — Yangi Patch posti va infografikasini yaratish\n"
-            "/fastpatch — Patchni to‘g‘ridan-to‘g‘ri kanalga chiqarish\n"
-            "/check_news — Yangiliklarni zudlik bilan tekshirish (05:00 cron)\n"
-            "/today — Bugungi o‘yinlar dasturi va markaziy bahs anonsi\n"
-            "/today_id — MPL ID bugungi matchday kartasi va AI tahlili\n"
-            "/today_ph — MPL PH bugungi matchday kartasi va AI tahlili\n"
-            "/today_my — MPL MY bugungi matchday kartasi va AI tahlili\n"
-            "/mpl_id — Liquipedia rasmiy MPL ID jadvali va kartasi\n"
-            "/mpl_ph — Liquipedia rasmiy MPL PH jadvali va kartasi\n"
-            "/mpl_my — Liquipedia rasmiy MPL MY jadvali va kartasi\n"
-            "/meta — mlbb.io dan Meta Tier (Strong, Traps, Gems) postini yaratish\n"
-            "/fastmeta — Meta Tier postini darhol kanalga chiqarish\n"
-            "/pause — Avtomatik yangilik yig‘ishni to‘xtatish\n"
-            "/resume — Yangilik yig‘ishni davom ettirish\n"
-            "/send &lt;id&gt; — Postni kanalga chiqarish\n"
-            "/fun — MLBB fakt yoki hazil postini zudlik bilan yaratish\n"
-            "/channels — Ulangan kanallar va ularni tekshirish\n"
+            "\n👑 <b>Administrator Boshqaruv Markazi</b>\n"
+            "Ekranning pastki qismidagi menyu tugmalari orqali barcha buyruqlarni 1 bosishda bajarishingiz mumkin!\n"
+            "To‘liq interaktiv boshqaruv paneli uchun: /admin\n\n"
+            "• 📊 /status — Tizim holati va statistika\n"
+            "• ⚔️ /today — Bugungi barcha o‘yinlar dasturi\n"
+            "• 🇲🇾 /mpl_my — MPL Malaysia jadvali va kartasi\n"
+            "• 🇮🇩 /mpl_id — MPL Indonesia jadvali va kartasi\n"
+            "• 🇵🇭 /mpl_ph — MPL Philippines jadvali va kartasi\n"
+            "• 👑 /meta — Meta Tier (Strong, Traps, Gems) posti\n"
+            "• 🆕 /newpatch — Yangi Patch infografikasi\n"
+            "• ⚡️ /check_news — Yangiliklarni tezkor tekshirish\n"
+            "• 🎮 /fun — MLBB Fakt / Fun posti\n"
+            "• 📢 /channels — Ulangan kanallar ro‘yxati\n"
+            "• 👥 /admins — Administratorlar ro‘yxati"
         )
-    await message.reply(text, parse_mode="HTML")
+    await message.reply(text, parse_mode="HTML", reply_markup=reply_markup)
+
+
+@bot_router.message(Command("admin"))
+async def cmd_admin_panel(message: Message):
+    user_id = message.from_user.id if message.from_user else 0
+    if not await is_authorized_admin(user_id):
+        await message.reply("Ruxsat berilmagan.")
+        return
+
+    from app.telegram.keyboards import get_admin_inline_panel, get_admin_reply_keyboard
+    text = (
+        "⚙️ <b>ADMIN INTERAKTIV BOSHQARUV PANELI</b>\n\n"
+        "Quyidagi tugmalar orqali istalgan amalni 1 bosishda ishga tushirishingiz mumkin:\n\n"
+        f"📊 <b>Holat:</b> {'⏸ To‘xtatilgan' if STATE['is_paused'] else '🟢 Faol ishlamoqda'}\n"
+        f"🇲🇾 <b>MPL MY:</b> {time_ago_str(STATE['last_checks']['MPL MY'])}\n"
+        f"🇮🇩 <b>MPL ID:</b> {time_ago_str(STATE['last_checks']['MPL ID'])}\n"
+        f"🇵🇭 <b>MPL PH:</b> {time_ago_str(STATE['last_checks']['MPL PH'])}"
+    )
+    await message.reply(
+        text,
+        parse_mode="HTML",
+        reply_markup=get_admin_inline_panel(is_paused=STATE["is_paused"])
+    )
 
 
 @bot_router.message(Command("help"))
@@ -1191,6 +1210,196 @@ async def cmd_generate_fun(message: Message, bot: Bot):
     except Exception as e:
         logger.error(f"Error generating fun post on demand: {e}", exc_info=True)
         await message.reply(f"❌ Xatolik yuz berdi: {e}")
+
+
+# ==========================================
+# Admin Persistent Reply Keyboard Text Handlers
+# ==========================================
+@bot_router.message(F.text == "📊 Holat")
+async def btn_status(message: Message):
+    user_id = message.from_user.id if message.from_user else 0
+    if await is_authorized_admin(user_id):
+        await cmd_status(message)
+
+
+@bot_router.message(F.text == "⚔️ Bugungi o‘yinlar")
+async def btn_today(message: Message, bot: Bot):
+    user_id = message.from_user.id if message.from_user else 0
+    if await is_authorized_admin(user_id):
+        await cmd_today_all(message, bot)
+
+
+@bot_router.message(F.text == "🇲🇾 MPL MY")
+async def btn_mpl_my(message: Message, bot: Bot):
+    user_id = message.from_user.id if message.from_user else 0
+    if await is_authorized_admin(user_id):
+        await cmd_mpl_my(message, bot)
+
+
+@bot_router.message(F.text == "🇮🇩 MPL ID")
+async def btn_mpl_id(message: Message, bot: Bot):
+    user_id = message.from_user.id if message.from_user else 0
+    if await is_authorized_admin(user_id):
+        await cmd_mpl_id(message, bot)
+
+
+@bot_router.message(F.text == "🇵🇭 MPL PH")
+async def btn_mpl_ph(message: Message, bot: Bot):
+    user_id = message.from_user.id if message.from_user else 0
+    if await is_authorized_admin(user_id):
+        await cmd_mpl_ph(message, bot)
+
+
+@bot_router.message(F.text == "👑 Meta Tier")
+async def btn_meta(message: Message, bot: Bot):
+    user_id = message.from_user.id if message.from_user else 0
+    if await is_authorized_admin(user_id):
+        from app.telegram.admin import cmd_meta_post
+        await cmd_meta_post(message, bot)
+
+
+@bot_router.message(F.text == "🆕 Yangi Patch")
+async def btn_patch(message: Message, bot: Bot):
+    user_id = message.from_user.id if message.from_user else 0
+    if await is_authorized_admin(user_id):
+        from app.telegram.admin import cmd_new_patch_post
+        await cmd_new_patch_post(message, bot)
+
+
+@bot_router.message(F.text == "⚡️ Yangilik tekshirish")
+async def btn_check_news(message: Message):
+    user_id = message.from_user.id if message.from_user else 0
+    if await is_authorized_admin(user_id):
+        await cmd_check_news(message)
+
+
+@bot_router.message(F.text == "🎮 MLBB Fakt / Fun")
+async def btn_fun(message: Message, bot: Bot):
+    user_id = message.from_user.id if message.from_user else 0
+    if await is_authorized_admin(user_id):
+        await cmd_generate_fun(message, bot)
+
+
+@bot_router.message(F.text == "⚙️ Admin Panel")
+async def btn_admin_panel(message: Message):
+    user_id = message.from_user.id if message.from_user else 0
+    if await is_authorized_admin(user_id):
+        await cmd_admin_panel(message)
+
+
+@bot_router.message(F.text == "📢 Kanallar")
+async def btn_channels(message: Message, bot: Bot):
+    user_id = message.from_user.id if message.from_user else 0
+    if await is_authorized_admin(user_id):
+        await cmd_channels(message, bot)
+
+
+# ==========================================
+# Admin Interactive Inline Panel Callback Handlers
+# ==========================================
+@bot_router.callback_query(F.data.startswith("admin_action:"))
+async def handle_admin_action_callback(callback: CallbackQuery, bot: Bot):
+    user_id = callback.from_user.id if callback.from_user else 0
+    if not await is_authorized_admin(user_id):
+        await callback.answer("Ruxsat berilmagan.", show_alert=True)
+        return
+
+    action = callback.data.split(":", 1)[1]
+    msg = callback.message
+
+    if action == "status":
+        await callback.answer("Tizim holati tekshirilmoqda...")
+        if msg:
+            await cmd_status(msg)
+    elif action == "today_all":
+        await callback.answer("Bugungi barcha o‘yinlar yuklanmoqda...")
+        if msg:
+            await cmd_today_all(msg, bot)
+    elif action == "mpl_my":
+        await callback.answer("MPL MY olinmoqda...")
+        if msg:
+            await cmd_mpl_my(msg, bot)
+    elif action == "mpl_id":
+        await callback.answer("MPL ID olinmoqda...")
+        if msg:
+            await cmd_mpl_id(msg, bot)
+    elif action == "mpl_ph":
+        await callback.answer("MPL PH olinmoqda...")
+        if msg:
+            await cmd_mpl_ph(msg, bot)
+    elif action == "meta_preview":
+        await callback.answer("Meta Tier yuklanmoqda...")
+        from app.telegram.admin import cmd_meta_post
+        if msg:
+            await cmd_meta_post(msg, bot)
+    elif action == "meta_fast":
+        await callback.answer("Tezkor Meta post tayyorlanmoqda...")
+        from app.telegram.admin import cmd_fast_meta_post
+        if msg:
+            await cmd_fast_meta_post(msg, bot)
+    elif action == "patch_preview":
+        await callback.answer("Patch notes infografikasi tayyorlanmoqda...")
+        from app.telegram.admin import cmd_new_patch_post
+        if msg:
+            await cmd_new_patch_post(msg, bot)
+    elif action == "patch_fast":
+        await callback.answer("Tezkor Patch post tayyorlanmoqda...")
+        from app.telegram.admin import cmd_fast_patch_post
+        if msg:
+            await cmd_fast_patch_post(msg, bot)
+    elif action == "check_news":
+        await callback.answer("Yangiliklar tekshirilmoqda...")
+        if msg:
+            await cmd_check_news(msg)
+    elif action == "fun":
+        await callback.answer("Fun post tayyorlanmoqda...")
+        if msg:
+            await cmd_generate_fun(msg, bot)
+    elif action == "pause":
+        STATE["is_paused"] = True
+        await callback.answer("Yangilik yig‘ish to‘xtatildi ⏸")
+        from app.telegram.keyboards import get_admin_inline_panel
+        if msg:
+            try:
+                await msg.edit_reply_markup(reply_markup=get_admin_inline_panel(is_paused=True))
+            except Exception:
+                pass
+    elif action == "resume":
+        STATE["is_paused"] = False
+        await callback.answer("Yangilik yig‘ish davom ettirildi ▶️")
+        from app.telegram.keyboards import get_admin_inline_panel
+        if msg:
+            try:
+                await msg.edit_reply_markup(reply_markup=get_admin_inline_panel(is_paused=False))
+            except Exception:
+                pass
+    elif action == "channels":
+        await callback.answer("Kanallar ro‘yxati...")
+        if msg:
+            await cmd_channels(msg, bot)
+    elif action == "admins":
+        await callback.answer("Adminlar ro‘yxati...")
+        from app.telegram.admin import cmd_list_admins
+        if msg:
+            await cmd_list_admins(msg)
+    elif action == "refresh_panel":
+        await callback.answer("Panel yangilandi 🔄")
+        from app.telegram.keyboards import get_admin_inline_panel
+        text = (
+            "⚙️ <b>ADMIN INTERAKTIV BOSHQARUV PANELI</b>\n\n"
+            "Quyidagi tugmalar orqali istalgan amalni 1 bosishda ishga tushirishingiz mumkin:\n\n"
+            f"📊 <b>Holat:</b> {'⏸ To‘xtatilgan' if STATE['is_paused'] else '🟢 Faol ishlamoqda'}\n"
+            f"🇲🇾 <b>MPL MY:</b> {time_ago_str(STATE['last_checks']['MPL MY'])}\n"
+            f"🇮🇩 <b>MPL ID:</b> {time_ago_str(STATE['last_checks']['MPL ID'])}\n"
+            f"🇵🇭 <b>MPL PH:</b> {time_ago_str(STATE['last_checks']['MPL PH'])}"
+        )
+        if msg:
+            try:
+                await msg.edit_text(text, parse_mode="HTML", reply_markup=get_admin_inline_panel(is_paused=STATE["is_paused"]))
+            except Exception:
+                pass
+    else:
+        await callback.answer("Noma'lum amal.")
 
 
 def create_bot_and_dispatcher() -> tuple[Optional[Bot], Dispatcher]:

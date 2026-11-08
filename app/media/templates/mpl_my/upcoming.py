@@ -218,3 +218,4 @@ def render_mpl_my_upcoming(match_data: Dict[str, Any]) -> bytes:
     draw.text((W - 55 - rw, H - 42), right_str, fill=(250, 204, 21), font=font_meta)
 
     return image_to_png_bytes(im)
+

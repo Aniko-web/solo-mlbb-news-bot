@@ -37,3 +37,4 @@ class MPLMYCollector(SourceCollector):
             logger.error(f"[{self.name}] Error during Liquipedia MPL MY fetch: {e}", exc_info=True)
 
         return items
+

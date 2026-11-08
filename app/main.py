@@ -22,6 +22,13 @@ async def main():
 
     # 2. Setup Bot & Dispatcher
     bot, dp = create_bot_and_dispatcher()
+    if bot:
+        from app.telegram.keyboards import setup_bot_commands
+        try:
+            await setup_bot_commands(bot)
+            logger.info("Bot commands menu registered successfully.")
+        except Exception as e:
+            logger.warning(f"Could not register bot commands menu: {e}")
 
     # 3. Setup Scheduler & Job Pipeline
     job_manager = NewsJobManager(bot=bot)
