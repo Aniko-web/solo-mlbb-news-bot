@@ -610,7 +610,8 @@ class NewsJobManager:
 
             caption = res["formatted_post"]
             img_bytes = res["image_bytes"]
-            content_hash = generate_content_hash("META_TIER_LIST", caption + str(int(time.time() / 86400)))
+            day_bucket = int(time.time() / 86400)
+            content_hash = generate_content_hash(f"META_TIER_LIST_{day_bucket}", caption)
 
             async with get_session() as session:
                 if await PostRepository.exists_by_hash(session, content_hash):

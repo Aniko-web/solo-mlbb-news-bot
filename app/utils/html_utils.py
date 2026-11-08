@@ -26,13 +26,13 @@ def safe_trim_html(text: str, max_len: int = 1020) -> str:
     chunk = re.sub(r"<[^>]*$", "", chunk)
 
     # Track open tags in the chunk
-    tag_regex = re.compile(r"<\s*(/)?\s*([a-zA-Z0-9]+)(?:\s+[^>]*)?>")
+    tag_regex = re.compile(r"<\s*(/)?\s*([a-zA-Z0-9\-]+)(?:\s+[^>]*)?>")
     open_stack: List[str] = []
 
     for match in tag_regex.finditer(chunk):
         is_closing = bool(match.group(1))
         tag_name = match.group(2).lower()
-        if tag_name in ["b", "i", "code", "pre", "a", "u", "s"]:
+        if tag_name in ["b", "i", "code", "pre", "a", "u", "s", "tg-emoji"]:
             if not is_closing:
                 open_stack.append(tag_name)
             else:

@@ -102,10 +102,10 @@ class AdminNotifier:
 
         for admin_id in target_ids:
             try:
+                from app.utils.html_utils import safe_trim_html, strip_html_tags
                 if image_bytes:
-                    from app.utils.html_utils import safe_trim_html
                     caption = safe_trim_html(preview_text, max_len=1020)
-                    photo_file = BufferedInputFile(image_bytes, filename=f"preview_{post_id}.png")
+                    photo_file = BufferedInputFile(image_bytes, filename=f"preview_{post_id}_{admin_id}.png")
                     try:
                         await self.bot.send_photo(
                             chat_id=admin_id,
@@ -116,19 +116,37 @@ class AdminNotifier:
                         )
                     except Exception as photo_ex:
                         logger.warning(f"Admin send_photo failed ({photo_ex}), falling back to send_message")
+                        text_to_send = safe_trim_html(preview_text, max_len=4000) if len(preview_text) > 4000 else preview_text
+                        try:
+                            await self.bot.send_message(
+                                chat_id=admin_id,
+                                text=text_to_send,
+                                reply_markup=keyboard,
+                                parse_mode="HTML"
+                            )
+                        except Exception as html_err:
+                            logger.warning(f"send_message HTML parse error ({html_err}), retrying as plain text")
+                            await self.bot.send_message(
+                                chat_id=admin_id,
+                                text=strip_html_tags(text_to_send)[:4000],
+                                reply_markup=keyboard
+                            )
+                else:
+                    text_to_send = safe_trim_html(preview_text, max_len=4000) if len(preview_text) > 4000 else preview_text
+                    try:
                         await self.bot.send_message(
                             chat_id=admin_id,
-                            text=preview_text,
+                            text=text_to_send,
                             reply_markup=keyboard,
                             parse_mode="HTML"
                         )
-                else:
-                    await self.bot.send_message(
-                        chat_id=admin_id,
-                        text=preview_text,
-                        reply_markup=keyboard,
-                        parse_mode="HTML"
-                    )
+                    except Exception as html_err:
+                        logger.warning(f"send_message HTML parse error ({html_err}), retrying as plain text")
+                        await self.bot.send_message(
+                            chat_id=admin_id,
+                            text=strip_html_tags(text_to_send)[:4000],
+                            reply_markup=keyboard
+                        )
             except Exception as e:
                 logger.error(f"Failed to send approval request to admin {admin_id}: {e}")
 
@@ -392,56 +410,69 @@ async def cmd_meta_post(message: Message, bot: Bot):
         await message.reply("Ruxsat berilmagan.")
         return
 
-    await message.reply("⏳ <i>mlbb.io dan Meta Tier ma'lumotlari yuklanmoqda va infografika chizilmoqda...</i>", parse_mode="HTML")
+    progress_msg = await message.reply("⏳ <i>mlbb.io dan Meta Tier ma'lumotlari yuklanmoqda va infografika chizilmoqda...</i>", parse_mode="HTML")
 
-    from app.services.meta_tier_service import MetaTierService
-    res = await MetaTierService.generate_meta_tier_post()
-    if not res.get("success"):
-        await message.reply("❌ Meta ma'lumotlarini yuklashda xatolik yuz berdi.")
-        return
+    try:
+        from app.services.meta_tier_service import MetaTierService
+        res = await MetaTierService.generate_meta_tier_post()
+        if not res.get("success") or not res.get("formatted_post"):
+            await progress_msg.edit_text("❌ Meta ma'lumotlarini yuklashda xatolik yuz berdi. Qayta urinib ko‘ring.", parse_mode="HTML")
+            return
 
-    import time
-    from app.database.database import get_session
-    from app.database.repositories import PostRepository
-    from app.utils.hashing import generate_content_hash
-    from app.utils.validators import PostStatus
+        import time
+        from app.database.database import get_session
+        from app.database.repositories import PostRepository
+        from app.utils.hashing import generate_content_hash
+        from app.utils.validators import PostStatus
 
-    caption = res["formatted_post"]
-    img_bytes = res["image_bytes"]
-    content_hash = generate_content_hash("META_TIER_LIST", caption + str(int(time.time() / 86400)))
+        caption = res["formatted_post"]
+        img_bytes = res["image_bytes"]
+        # Har bir qo'lda chaqirilgan buyruq uchun unikal hash (time.time() bilan) yaratiladi
+        now = time.time()
+        content_hash = generate_content_hash(f"META_TIER_LIST_{now}", f"{now}_{caption}")
 
-    card_path = None
-    if img_bytes:
-        generated_dir = os.path.join(os.getcwd(), "assets", "generated")
-        os.makedirs(generated_dir, exist_ok=True)
-        card_path = os.path.join(generated_dir, f"meta_tier_{int(time.time())}.png")
-        with open(card_path, "wb") as f:
-            f.write(img_bytes)
+        card_path = None
+        if img_bytes:
+            generated_dir = os.path.join(os.getcwd(), "assets", "generated")
+            os.makedirs(generated_dir, exist_ok=True)
+            card_path = os.path.join(generated_dir, f"meta_tier_{int(time.time())}.png")
+            with open(card_path, "wb") as f:
+                f.write(img_bytes)
 
-    async with get_session() as session:
-        db_post = await PostRepository.create_post(
-            session=session,
-            source_url="https://mlbb.io/en/hero-tier",
-            title="Mobile Legends Meta Hero Tier List (mlbb.io)",
-            category="META",
-            content_hash=content_hash,
-            status=PostStatus.PENDING.value,
-            raw_content="MLBB Hero Tier List from mlbb.io",
+        async with get_session() as session:
+            db_post = await PostRepository.create_post(
+                session=session,
+                source_url="https://mlbb.io/en/hero-tier",
+                title="Mobile Legends Meta Hero Tier List (mlbb.io)",
+                category="META",
+                content_hash=content_hash,
+                status=PostStatus.PENDING.value,
+                raw_content="MLBB Hero Tier List from mlbb.io",
+                formatted_post=caption,
+                image_url=card_path,
+                reliability_score=100,
+                confidence_score=1.0
+            )
+            post_id = db_post.id
+
+        notifier = AdminNotifier(bot=bot)
+        await notifier.send_approval_request(
+            post_id=post_id,
+            category="META TIER LIST",
             formatted_post=caption,
-            image_url=card_path,
-            reliability_score=100,
-            confidence_score=1.0
+            image_bytes=img_bytes
         )
-        post_id = db_post.id
-
-    notifier = AdminNotifier(bot=bot)
-    await notifier.send_approval_request(
-        post_id=post_id,
-        category="META TIER LIST",
-        formatted_post=caption,
-        image_bytes=img_bytes
-    )
-    await message.reply(f"✅ <b>Meta Tier List #{post_id} tayyorlandi!</b> Yuqoridagi preview orqali tasdiqlab kanalga chiqarishingiz mumkin.", parse_mode="HTML")
+        await progress_msg.edit_text(
+            f"✅ <b>Meta Tier List #{post_id} muvaffaqiyatli tayyorlandi!</b>\n\n"
+            f"Yuqoridagi preview xabaridagi <b>[✅ Publish]</b> tugmasini bosib kanalga chiqarishingiz mumkin.",
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        logger.error(f"Error handling /meta command: {e}", exc_info=True)
+        try:
+            await progress_msg.edit_text(f"❌ Xatolik yuz berdi: <code>{e}</code>", parse_mode="HTML")
+        except Exception:
+            await message.reply(f"❌ Xatolik yuz berdi: <code>{e}</code>", parse_mode="HTML")
 
 
 @admin_router.message(Command("fastmeta"))
@@ -451,59 +482,67 @@ async def cmd_fast_meta_post(message: Message, bot: Bot):
         await message.reply("Ruxsat berilmagan.")
         return
 
-    await message.reply("🚀 <i>mlbb.io Meta Tier posti to‘g‘ridan-to‘g‘ri kanalga chiqarilmoqda...</i>", parse_mode="HTML")
+    progress_msg = await message.reply("🚀 <i>mlbb.io Meta Tier posti to‘g‘ridan-to‘g‘ri kanalga chiqarilmoqda...</i>", parse_mode="HTML")
 
-    from app.services.meta_tier_service import MetaTierService
-    res = await MetaTierService.generate_meta_tier_post()
-    if not res.get("success"):
-        await message.reply("❌ Meta ma'lumotlarini yuklashda xatolik yuz berdi.")
-        return
+    try:
+        from app.services.meta_tier_service import MetaTierService
+        res = await MetaTierService.generate_meta_tier_post()
+        if not res.get("success") or not res.get("formatted_post"):
+            await progress_msg.edit_text("❌ Meta ma'lumotlarini yuklashda xatolik yuz berdi.", parse_mode="HTML")
+            return
 
-    import time
-    from app.database.database import get_session
-    from app.database.repositories import PostRepository
-    from app.utils.hashing import generate_content_hash
-    from app.utils.validators import PostStatus
-    from app.telegram.publisher import TelegramPublisher
+        import time
+        from app.database.database import get_session
+        from app.database.repositories import PostRepository
+        from app.utils.hashing import generate_content_hash
+        from app.utils.validators import PostStatus
+        from app.telegram.publisher import TelegramPublisher
 
-    caption = res["formatted_post"]
-    img_bytes = res["image_bytes"]
-    content_hash = generate_content_hash("META_TIER_LIST", caption + str(int(time.time() / 86400)))
+        caption = res["formatted_post"]
+        img_bytes = res["image_bytes"]
+        now = time.time()
+        content_hash = generate_content_hash(f"META_TIER_LIST_{now}", f"{now}_{caption}")
 
-    card_path = None
-    if img_bytes:
-        generated_dir = os.path.join(os.getcwd(), "assets", "generated")
-        os.makedirs(generated_dir, exist_ok=True)
-        card_path = os.path.join(generated_dir, f"meta_tier_{int(time.time())}.png")
-        with open(card_path, "wb") as f:
-            f.write(img_bytes)
+        card_path = None
+        if img_bytes:
+            generated_dir = os.path.join(os.getcwd(), "assets", "generated")
+            os.makedirs(generated_dir, exist_ok=True)
+            card_path = os.path.join(generated_dir, f"meta_tier_{int(time.time())}.png")
+            with open(card_path, "wb") as f:
+                f.write(img_bytes)
 
-    async with get_session() as session:
-        db_post = await PostRepository.create_post(
-            session=session,
-            source_url="https://mlbb.io/en/hero-tier",
-            title="Mobile Legends Meta Hero Tier List (mlbb.io)",
-            category="META",
-            content_hash=content_hash,
-            status=PostStatus.PENDING.value,
-            raw_content="MLBB Hero Tier List from mlbb.io",
-            formatted_post=caption,
-            image_url=card_path,
-            reliability_score=100,
-            confidence_score=1.0
+        async with get_session() as session:
+            db_post = await PostRepository.create_post(
+                session=session,
+                source_url="https://mlbb.io/en/hero-tier",
+                title="Mobile Legends Meta Hero Tier List (mlbb.io)",
+                category="META",
+                content_hash=content_hash,
+                status=PostStatus.PENDING.value,
+                raw_content="MLBB Hero Tier List from mlbb.io",
+                formatted_post=caption,
+                image_url=card_path,
+                reliability_score=100,
+                confidence_score=1.0
+            )
+            post_id = db_post.id
+
+        publisher = TelegramPublisher(bot=bot)
+        msg_id = await publisher.publish_post(
+            post_id=post_id,
+            formatted_text=caption,
+            image_bytes=img_bytes
         )
-        post_id = db_post.id
-
-    publisher = TelegramPublisher(bot=bot)
-    msg_id = await publisher.publish_post(
-        post_id=post_id,
-        formatted_text=caption,
-        image_bytes=img_bytes
-    )
-    if msg_id:
-        await message.reply(f"🎉 <b>Meta Tier List post #{post_id} muvaffaqiyatli kanalga chop etildi!</b> (Msg ID: <code>{msg_id}</code>)", parse_mode="HTML")
-    else:
-        await message.reply("❌ Post kanalga yuborilmadi, xatolik yuz berdi.")
+        if msg_id:
+            await progress_msg.edit_text(f"🎉 <b>Meta Tier List post #{post_id} muvaffaqiyatli kanalga chop etildi!</b> (Msg ID: <code>{msg_id}</code>)", parse_mode="HTML")
+        else:
+            await progress_msg.edit_text("❌ Post kanalga yuborilmadi, xatolik yuz berdi.", parse_mode="HTML")
+    except Exception as e:
+        logger.error(f"Error handling /fastmeta command: {e}", exc_info=True)
+        try:
+            await progress_msg.edit_text(f"❌ Xatolik yuz berdi: <code>{e}</code>", parse_mode="HTML")
+        except Exception:
+            await message.reply(f"❌ Xatolik yuz berdi: <code>{e}</code>", parse_mode="HTML")
 
 
 
