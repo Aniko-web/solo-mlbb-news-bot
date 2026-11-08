@@ -349,6 +349,27 @@ class AIAnalyzer:
                 )
             return PostFormatter.format_news(title, summary, points, item.source_url)
 
+        elif category == CategoryEnum.MPL_MY:
+            score_a = verified.get("score_a") if verified.get("score_a") is not None else item.metadata.get("score_a")
+            score_b = verified.get("score_b") if verified.get("score_b") is not None else item.metadata.get("score_b")
+            is_finished = (
+                verified.get("status") == "finished"
+                or item.metadata.get("status") == "finished"
+                or (score_a is not None and score_b is not None)
+            )
+            if is_finished and score_a is not None and score_b is not None:
+                return PostFormatter.format_mpl_my_result(
+                    team_a=verified.get("team_a") or item.metadata.get("team_a", "Team A"),
+                    score_a=score_a,
+                    score_b=score_b,
+                    team_b=verified.get("team_b") or item.metadata.get("team_b", "Team B"),
+                    date_str=verified.get("date") or item.metadata.get("date", "Bugun"),
+                    week=UzbekTranslator.translate_sentence(verified.get("week") or item.metadata.get("week") or ""),
+                    mvp=verified.get("mvp") or item.metadata.get("mvp"),
+                    source_url=item.source_url
+                )
+            return PostFormatter.format_news(title, summary, points, item.source_url)
+
         elif category in [CategoryEnum.ESPORTS, CategoryEnum.TOURNAMENT]:
             return PostFormatter.format_esports(
                 title=title,
@@ -386,6 +407,19 @@ class AIAnalyzer:
         "BLACKLIST INT.": 80,
         "TWISTED MINDS": 78,
         "TNC PRO TEAM": 75,
+        # MPL MY
+        "SELANGOR RED GIANTS": 95,
+        "TEAM VAMOS": 91,
+        "HOMEBOIS": 88,
+        "TODAK": 86,
+        "MONSTER VICIOUS": 83,
+        "TEAM HAQ": 82,
+        "JP NINERS": 80,
+        "TEAM REY": 78,
+        "CG ESPORTS": 77,
+        "AERO ESPORTS": 76,
+        "UNTITLED ESPORTS": 75,
+        "GAMESMY KELANTAN": 74,
     }
 
     async def predict_match(

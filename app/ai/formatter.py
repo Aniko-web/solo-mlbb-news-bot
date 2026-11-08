@@ -220,6 +220,40 @@ class PostFormatter:
         return "\n".join(lines)
 
     @staticmethod
+    def format_mpl_my_result(
+        team_a: str,
+        score_a: int,
+        score_b: int,
+        team_b: str,
+        date_str: str,
+        week: Optional[Any] = None,
+        mvp: Optional[str] = None,
+        source_url: Optional[str] = None
+    ) -> str:
+        lines = [
+            "🇲🇾 <b>MPL MY — NATIJA</b>\n",
+            f"<b>{team_a} {score_a} — {score_b} {team_b}</b>\n"
+        ]
+        if mvp and str(mvp).strip() and str(mvp).lower() not in ("unknown", "none", "yo'q", "mavjud emas", "null"):
+            lines.append(f"⭐ <b>MVP:</b> {mvp}\n")
+
+        info_lines = []
+        if week:
+            week_text = f"Week {week}" if str(week).isdigit() else str(week)
+            info_lines.append(f"📌 {week_text}")
+        if date_str:
+            info_lines.append(f"📅 {date_str}")
+        if info_lines:
+            lines.append("\n".join(info_lines) + "\n")
+
+        if source_url:
+            lines.append(f"🔗 <b>Batafsil:</b> <a href=\"{source_url}\">Havola</a>\n")
+
+        lines.append("#MPLMY #MLBB @murodalievgg\n")
+        lines.append(CHANNEL_FOOTER)
+        return "\n".join(lines)
+
+    @staticmethod
     def format_mpl_ph_result(
         team_a: str,
         score_a: int,
@@ -271,6 +305,17 @@ class PostFormatter:
 
         if "PH" in league or "PHILIPPINES" in league:
             return cls.format_mpl_ph_result(
+                team_a=team_a,
+                score_a=score_a,
+                score_b=score_b,
+                team_b=team_b,
+                date_str=date_str,
+                week=week,
+                mvp=mvp,
+                source_url=source_url
+            )
+        elif "MY" in league or "MALAYSIA" in league:
+            return cls.format_mpl_my_result(
                 team_a=team_a,
                 score_a=score_a,
                 score_b=score_b,
@@ -400,6 +445,60 @@ class PostFormatter:
         lines.append(CHANNEL_FOOTER)
         return "\n".join(lines)
 
+    @staticmethod
+    def format_mpl_my_upcoming(
+        team_a: str,
+        team_b: str,
+        time_str: str = "15:00",
+        date_str: str = "",
+        week: Optional[Any] = None,
+        series: str = "BO3",
+        source_url: Optional[str] = None,
+        countdown_str: Optional[str] = None,
+        ai_prediction: Optional[Dict[str, Any]] = None
+    ) -> str:
+        lines = [
+            "🇲🇾 <b>MPL MY — KUTILAYOTGAN O‘YIN</b>\n",
+            f"<b>{team_a} 🆚 {team_b}</b>\n"
+        ]
+        info_lines = []
+        if time_str:
+            time_clean = time_str if ("MYT" in time_str or "UZ" in time_str) else f"{time_str} (MYT)"
+            info_lines.append(f"🕐 <b>Vaqt:</b> {time_clean}")
+        if countdown_str and countdown_str != "Tugagan":
+            info_lines.append(f"⏳ <b>O‘yinga qolgan vaqt:</b> {countdown_str}")
+        if week:
+            week_text = f"Week {week}" if str(week).isdigit() else str(week)
+            info_lines.append(f"📌 {week_text} • {series}")
+        elif series:
+            info_lines.append(f"📌 {series}")
+        if date_str:
+            info_lines.append(f"📅 {date_str}")
+        if info_lines:
+            lines.append("\n".join(info_lines) + "\n")
+
+        # AI Prediction Block
+        if ai_prediction:
+            sa = ai_prediction.get("predicted_score_a", 2)
+            sb = ai_prediction.get("predicted_score_b", 1)
+            pa = ai_prediction.get("prob_a", 55)
+            pb = ai_prediction.get("prob_b", 45)
+            comm = ai_prediction.get("commentary_uz", "").strip()
+
+            lines.append("🤖 <b>AI TAHLILI VA TAXMINIY HISOB:</b>")
+            lines.append(f"🎯 <b>Taxminiy hisob:</b> <code>{team_a} {sa} — {sb} {team_b}</code>")
+            lines.append(f"📊 <b>G‘alaba ehtimoli:</b> {team_a} ({pa}%) | {team_b} ({pb}%)")
+            if comm:
+                lines.append(f"🎙 <i>{comm}</i>")
+            lines.append("")
+
+        if source_url:
+            lines.append(f"🔗 <b>Batafsil:</b> <a href=\"{source_url}\">Liquipedia</a>\n")
+
+        lines.append("#MPLMY #MLBB #AIPrognoz @murodalievgg\n")
+        lines.append(CHANNEL_FOOTER)
+        return "\n".join(lines)
+
     @classmethod
     def format_match_upcoming_from_data(
         cls,
@@ -419,6 +518,18 @@ class PostFormatter:
 
         if "PH" in league or "PHILIPPINES" in league:
             return cls.format_mpl_ph_upcoming(
+                team_a=team_a,
+                team_b=team_b,
+                time_str=time_str,
+                date_str=date_str,
+                week=week,
+                series=series,
+                source_url=source_url,
+                countdown_str=countdown_str,
+                ai_prediction=ai_prediction
+            )
+        elif "MY" in league or "MALAYSIA" in league:
+            return cls.format_mpl_my_upcoming(
                 team_a=team_a,
                 team_b=team_b,
                 time_str=time_str,

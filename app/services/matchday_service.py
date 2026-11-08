@@ -91,8 +91,9 @@ class MatchdayService:
         Varies by season, day of week, time to next match, and upcoming matchups.
         """
         import random
+        is_my = "MY" in league.upper()
         is_ph = "PH" in league.upper()
-        league_title = "MPL Philippines" if is_ph else "MPL Indonesia"
+        league_title = "MPL Malaysia" if is_my else ("MPL Philippines" if is_ph else "MPL Indonesia")
         today_dt = None
         try:
             today_dt = datetime.strptime(today_date, "%Y-%m-%d")
@@ -183,7 +184,9 @@ class MatchdayService:
         try:
             from app.database.database import get_session
             from app.database.repositories import MatchRepository
-            normalized_league = "MPL PH" if "PH" in league.upper() else "MPL ID"
+            is_my = "MY" in league.upper()
+            is_ph = "PH" in league.upper()
+            normalized_league = "MPL MY" if is_my else ("MPL PH" if is_ph else "MPL ID")
             async with get_session() as session:
                 db_matches = await MatchRepository.get_all_matches_by_league(session, normalized_league)
                 if db_matches:
@@ -193,8 +196,9 @@ class MatchdayService:
 
         # 2. Fallback to Liquipedia API if local DB is empty
         if not all_matches:
-            is_ph = "PH" in league.upper()
-            if is_ph:
+            if "MY" in league.upper():
+                all_matches = await LiquipediaParserService.fetch_and_parse_mpl_my(16)
+            elif "PH" in league.upper():
                 all_matches = await LiquipediaParserService.fetch_and_parse_mpl_ph(18)
             else:
                 all_matches = await LiquipediaParserService.fetch_and_parse_mpl_id(18)
@@ -395,10 +399,11 @@ class MatchdayService:
         """
         Builds compliant, aesthetically formatted Telegram HTML caption.
         """
+        is_my = "MY" in league.upper()
         is_ph = "PH" in league.upper()
-        league_title = "MPL PHILIPPINES" if is_ph else "MPL INDONESIA"
+        league_title = "MPL MALAYSIA" if is_my else ("MPL PHILIPPINES" if is_ph else "MPL INDONESIA")
         date_display = cls.format_uzbek_date_header(date_str)
-        hashtag = "#MPLPH" if is_ph else "#MPLID"
+        hashtag = "#MPLMY" if is_my else ("#MPLPH" if is_ph else "#MPLID")
 
         lines = [
             f"📅 <b>BUGUNGI O‘YINLAR DASTURI — {league_title}</b>",
@@ -449,9 +454,10 @@ class MatchdayService:
         Builds a concise, authentic gamer-slang post for a rest day without boilerplate.
         """
         import random
+        is_my = "MY" in league.upper()
         is_ph = "PH" in league.upper()
-        league_title = "MPL PHILIPPINES" if is_ph else "MPL INDONESIA"
-        hashtag = "#MPLPH" if is_ph else "#MPLID"
+        league_title = "MPL MALAYSIA" if is_my else ("MPL PHILIPPINES" if is_ph else "MPL INDONESIA")
+        hashtag = "#MPLMY" if is_my else ("#MPLPH" if is_ph else "#MPLID")
         today_display = cls.format_uzbek_date_header(today_date)
 
         if not humor_text:

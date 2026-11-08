@@ -359,6 +359,11 @@ def draw_shared_brand_badge(
         border = (220, 38, 38)
         dot_color = (220, 38, 38)
         text_color = (241, 245, 249)
+    elif theme == "my":
+        bg = (12, 18, 36, 230)
+        border = (234, 179, 8)
+        dot_color = (234, 179, 8)
+        text_color = (248, 250, 252)
     else:
         bg = (10, 22, 44, 230)
         border = (14, 165, 233)

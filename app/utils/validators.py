@@ -37,8 +37,8 @@ def parse_match_datetime_uz(match_date: str, match_time: Optional[str] = None) -
         if m_wib:
             wib_h, m = int(m_wib.group(1)), int(m_wib.group(2))
             h = (wib_h - 2) % 24
-    elif "PHT" in raw_time.upper():
-        # PHT is UTC+8 -> Tashkent is UTC+5 (-3 hours)
+    elif "PHT" in raw_time.upper() or "MYT" in raw_time.upper():
+        # PHT and MYT are UTC+8 -> Tashkent is UTC+5 (-3 hours)
         m_pht = re.search(r"(\d{1,2}):(\d{2})", raw_time)
         if m_pht:
             pht_h, m = int(m_pht.group(1)), int(m_pht.group(2))
@@ -79,6 +79,7 @@ class CategoryEnum(str, Enum):
     EVENT = "EVENT"
     MPL_ID = "MPL_ID"
     MPL_PH = "MPL_PH"
+    MPL_MY = "MPL_MY"
     ESPORTS = "ESPORTS"
     TOURNAMENT = "TOURNAMENT"
     FACT = "FACT"

@@ -2,6 +2,7 @@ from typing import Dict, Any
 from app.utils.logger import logger
 from app.media.templates.mpl_id import render_mpl_id_result, render_mpl_id_upcoming
 from app.media.templates.mpl_ph import render_mpl_ph_result, render_mpl_ph_upcoming
+from app.media.templates.mpl_my import render_mpl_my_result, render_mpl_my_upcoming
 from app.media.templates.patch_recap import render_patch_recap
 from app.media.templates.matchday_card import render_matchday_card
 
@@ -28,6 +29,9 @@ def render_match_result(match_data: Dict[str, Any]) -> bytes:
     elif "PH" in league or "PHILIPPINES" in league:
         logger.info(f"Rendering MPL PH result graphic for {match_data.get('team_a')} vs {match_data.get('team_b')}")
         return render_mpl_ph_result(match_data)
+    elif "MY" in league or "MALAYSIA" in league:
+        logger.info(f"Rendering MPL MY result graphic for {match_data.get('team_a')} vs {match_data.get('team_b')}")
+        return render_mpl_my_result(match_data)
     else:
         # Default to MPL ID theme for generic leagues
         logger.info(f"Defaulting league '{league}' to MPL ID result template")
@@ -47,6 +51,9 @@ def render_match_upcoming(match_data: Dict[str, Any]) -> bytes:
     elif "PH" in league or "PHILIPPINES" in league:
         logger.info(f"Rendering MPL PH upcoming graphic for {match_data.get('team_a')} vs {match_data.get('team_b')}")
         return render_mpl_ph_upcoming(match_data)
+    elif "MY" in league or "MALAYSIA" in league:
+        logger.info(f"Rendering MPL MY upcoming graphic for {match_data.get('team_a')} vs {match_data.get('team_b')}")
+        return render_mpl_my_upcoming(match_data)
     else:
         logger.info(f"Defaulting league '{league}' to MPL ID upcoming template")
         return render_mpl_id_upcoming(match_data)

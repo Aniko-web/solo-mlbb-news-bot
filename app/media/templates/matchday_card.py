@@ -65,12 +65,21 @@ def render_matchday_card(data: Dict[str, Any]) -> bytes:
     W, H = 1200, 675
     league = str(data.get("league") or "MPL ID").upper()
     is_ph = "PH" in league
+    is_my = "MY" in league
 
     # 1. Base Canvas & Dynamic Esports Stage Background
     im = Image.new("RGB", (W, H), color=(8, 10, 18))
     draw = ImageDraw.Draw(im)
 
-    if is_ph:
+    if is_my:
+        # Royal navy & solar gold stadium gradient
+        for y in range(H):
+            ratio = y / H
+            r = int(6 + ratio * 8)
+            g = int(12 + ratio * 15)
+            b = int(26 + ratio * 28)
+            draw.line([(0, y), (W, y)], fill=(r, g, b))
+    elif is_ph:
         # Midnight navy & solar electric stadium gradient
         for y in range(H):
             ratio = y / H
@@ -91,7 +100,7 @@ def render_matchday_card(data: Dict[str, Any]) -> bytes:
     bg_fx = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     fx_draw = ImageDraw.Draw(bg_fx)
 
-    accent_glow = (14, 165, 233) if is_ph else (220, 38, 38)
+    accent_glow = (234, 179, 8) if is_my else ((14, 165, 233) if is_ph else (220, 38, 38))
     gold_glow = (245, 158, 11)
 
     # Top-left and bottom-right glow
@@ -111,7 +120,7 @@ def render_matchday_card(data: Dict[str, Any]) -> bytes:
     font_league = load_font("Impact.ttf", 32)
     font_sub = load_font("Arial-Bold.ttf", 15)
 
-    league_logo_file = "mpl_ph.png" if is_ph else "mpl_id.png"
+    league_logo_file = "mpl_my.png" if is_my else ("mpl_ph.png" if is_ph else "mpl_id.png")
     league_logo_path = os.path.join(LOGOS_DIR, league_logo_file)
     header_logo_w = 0
 
@@ -125,16 +134,17 @@ def render_matchday_card(data: Dict[str, Any]) -> bytes:
             pass
 
     header_x = 48 + header_logo_w
-    league_title = "MPL PHILIPPINES" if is_ph else "MPL INDONESIA"
+    league_title = "MPL MALAYSIA" if is_my else ("MPL PHILIPPINES" if is_ph else "MPL INDONESIA")
     draw.text((header_x, 22), league_title, fill=(255, 255, 255), font=font_league)
 
     date_display = str(data.get("date_display") or data.get("date") or "BUGUN").upper()
-    season_text = str(data.get("season") or "SEASON 18").upper()
+    season_text = str(data.get("season") or "SEASON 16").upper()
     subtitle_text = f"BUGUNGI O‘YINLAR DASTURI   •   {date_display}   •   {season_text}"
-    draw.text((header_x, 58), subtitle_text, fill=(56, 189, 248) if is_ph else (239, 68, 68), font=font_sub)
+    sub_color = (250, 204, 21) if is_my else ((56, 189, 248) if is_ph else (239, 68, 68))
+    draw.text((header_x, 58), subtitle_text, fill=sub_color, font=font_sub)
 
     # Right branding
-    draw_shared_brand_badge(im, W - 180, 32, theme="ph" if is_ph else "id")
+    draw_shared_brand_badge(im, W - 180, 32, theme="my" if is_my else ("ph" if is_ph else "id"))
 
     # Header separator rule
     draw.line([(48, 98), (W - 48, 98)], fill=(30, 41, 59), width=1)

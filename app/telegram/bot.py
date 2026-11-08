@@ -35,6 +35,7 @@ STATE = {
         "MLBB": None,
         "MPL ID": None,
         "MPL PH": None,
+        "MPL MY": None,
         "Esports": None
     }
 }
@@ -79,8 +80,10 @@ async def cmd_start(message: Message):
             "/today — Bugungi o‘yinlar dasturi va markaziy bahs anonsi\n"
             "/today_id — MPL ID bugungi matchday kartasi va AI tahlili\n"
             "/today_ph — MPL PH bugungi matchday kartasi va AI tahlili\n"
+            "/today_my — MPL MY bugungi matchday kartasi va AI tahlili\n"
             "/mpl_id — Liquipedia rasmiy MPL ID jadvali va kartasi\n"
             "/mpl_ph — Liquipedia rasmiy MPL PH jadvali va kartasi\n"
+            "/mpl_my — Liquipedia rasmiy MPL MY jadvali va kartasi\n"
             "/meta — mlbb.io dan Meta Tier (Strong, Traps, Gems) postini yaratish\n"
             "/fastmeta — Meta Tier postini darhol kanalga chiqarish\n"
             "/pause — Avtomatik yangilik yig‘ishni to‘xtatish\n"
@@ -107,6 +110,7 @@ async def cmd_status(message: Message):
     mlbb_ago = time_ago_str(STATE["last_checks"]["MLBB"])
     mpl_id_ago = time_ago_str(STATE["last_checks"]["MPL ID"])
     mpl_ph_ago = time_ago_str(STATE["last_checks"]["MPL PH"])
+    mpl_my_ago = time_ago_str(STATE["last_checks"]["MPL MY"])
 
     status_report = (
         f"🤖 <b>MLBB NEWS AGENT</b>\n"
@@ -114,11 +118,12 @@ async def cmd_status(message: Message):
         f"Mode: {'Auto Publish' if settings.AUTO_PUBLISH else f'Admin Approval (Avto-uzatish: {settings.APPROVAL_TIMEOUT_MINUTES} daq)'}\n\n"
         f"⏰ <b>Jadvallar:</b>\n"
         f"• Ertalabki yangiliklar: Har kuni {settings.DAILY_NEWS_HOUR:02d}:{settings.DAILY_NEWS_MINUTE:02d} (max {settings.MAX_DAILY_NEWS_COUNT} ta)\n"
-        f"• Jonli o‘yinlar: Har {settings.CHECK_INTERVAL_MPL_ID_MIN} daqiqada (Oldin + Natija)\n\n"
+        f"• Jonli o‘yinlar: Har {settings.CHECK_INTERVAL_MPL_ID_MIN} daqiqada (ID, PH, MY)\n\n"
         f"Oxirgi tekshiruvlar:\n"
         f"MLBB: {mlbb_ago}\n"
         f"MPL ID: {mpl_id_ago}\n"
-        f"MPL PH: {mpl_ph_ago}\n\n"
+        f"MPL PH: {mpl_ph_ago}\n"
+        f"MPL MY: {mpl_my_ago}\n\n"
         f"Bugungi postlar: {posts_today}\n"
         f"Xatoliklar: {errors_today}"
     )
@@ -715,6 +720,92 @@ async def cmd_mpl_ph(message: Message, bot: Bot):
         await message.reply(f"❌ Xatolik yuz berdi: {e}")
 
 
+@bot_router.message(Command("mpl_my"))
+async def cmd_mpl_my(message: Message, bot: Bot):
+    user_id = message.from_user.id if message.from_user else 0
+    if not await is_authorized_admin(user_id):
+        await message.reply("Faqat admin uchun ruxsat berilgan.")
+        return
+
+    await message.reply("🔄 <b>Liquipedia</b> dan MPL Malaysia Season 16 jadvallari va natijalari olinmoqda...", parse_mode="HTML")
+    from app.services.liquipedia_parser import LiquipediaParserService
+    from app.media.image_processor import ImageProcessor
+    from aiogram.types import BufferedInputFile
+
+    try:
+        matches = await LiquipediaParserService.fetch_and_parse_mpl_my(season=16)
+        if not matches:
+            matches = await LiquipediaParserService.fetch_and_parse_mpl_my(season=15)
+
+        if not matches:
+            await message.reply("⚠️ Liquipedia dan MPL Malaysia o‘yinlari topilmadi.")
+            return
+
+        upcoming = [m for m in matches if m.status == "upcoming"]
+        finished = [m for m in matches if m.status == "finished"]
+
+        text_lines = [
+            f"🇲🇾 <b>MPL MALAYSIA — LIQUIPEDIA JADVALI</b>\n",
+            f"📊 Jami o‘yinlar: <b>{len(matches)}</b> ta | Kutilayotgan: <b>{len(upcoming)}</b> | Tugagan: <b>{len(finished)}</b>\n"
+        ]
+
+        if upcoming:
+            text_lines.append("⏳ <b>Yaqinlashib kelayotgan o‘yinlar:</b>")
+            for m in upcoming[:4]:
+                dt_str = m.date
+                text_lines.append(f"• <b>{m.team_a}</b> vs <b>{m.team_b}</b> | 📅 {dt_str} {m.time} ({m.week}-hafta)")
+            text_lines.append("")
+
+        if finished:
+            text_lines.append("🏆 <b>So‘nggi o‘yin natijalari:</b>")
+            for m in finished[-2:]:
+                sc = f"{m.score_a} : {m.score_b}" if m.score_a is not None else "Tugagan"
+                mvp_str = f" (MVP: {m.mvp})" if m.mvp else ""
+                text_lines.append(f"• <b>{m.team_a}</b> {sc} <b>{m.team_b}</b>{mvp_str} | {m.week}-hafta")
+
+        text_lines.append("\n💡 <i>O‘yin kartasini avtomatik chiqarish uchun /check_matches buyrug‘idan foydalaning.</i>")
+        report_text = "\n".join(text_lines)
+
+        from app.utils.html_utils import safe_trim_html
+
+        target_match = upcoming[0] if upcoming else (finished[-1] if finished else None)
+        if target_match:
+            match_dict = {
+                "league": "MPL MY",
+                "team_a": target_match.team_a,
+                "team_b": target_match.team_b,
+                "score_a": target_match.score_a,
+                "score_b": target_match.score_b,
+                "status": "FINAL" if target_match.status == "finished" else "UPCOMING",
+                "mvp": target_match.mvp,
+                "date": target_match.date,
+                "time": target_match.time,
+                "week": target_match.week,
+                "season": target_match.season,
+                "series": target_match.series
+            }
+            if target_match.status == "finished":
+                img_bytes = ImageProcessor.render_match_result(match_dict)
+            else:
+                img_bytes = ImageProcessor.render_match_upcoming(match_dict)
+
+            photo = BufferedInputFile(img_bytes, filename="mpl_my_preview.png")
+            safe_caption = safe_trim_html(report_text, max_len=1020)
+            try:
+                await message.reply_photo(photo=photo, caption=safe_caption, parse_mode="HTML")
+            except Exception as photo_err:
+                logger.warning(f"Reply photo failed ({photo_err}), sending fallback")
+                brief_cap = f"🇲🇾 <b>MPL MY — {target_match.team_a} vs {target_match.team_b}</b>"
+                await message.reply_photo(photo=photo, caption=brief_cap, parse_mode="HTML")
+                await message.reply(safe_trim_html(report_text, max_len=4000), parse_mode="HTML")
+        else:
+            await message.reply(safe_trim_html(report_text, max_len=4000), parse_mode="HTML")
+
+    except Exception as e:
+        logger.error(f"Error in cmd_mpl_my: {e}", exc_info=True)
+        await message.reply(f"❌ Xatolik yuz berdi: {e}")
+
+
 @bot_router.message(Command("today"))
 @bot_router.message(Command("matchday"))
 async def cmd_today_all(message: Message, bot: Bot):
@@ -731,12 +822,14 @@ async def cmd_today_all(message: Message, bot: Bot):
 
     res_id = await MatchdayService.generate_matchday_post("MPL ID", analyzer=analyzer)
     res_ph = await MatchdayService.generate_matchday_post("MPL PH", analyzer=analyzer)
+    res_my = await MatchdayService.generate_matchday_post("MPL MY", analyzer=analyzer)
 
     id_rest = res_id.get("is_rest_day", False)
     ph_rest = res_ph.get("is_rest_day", False)
+    my_rest = res_my.get("is_rest_day", False)
 
-    if id_rest and ph_rest:
-        # Both leagues are having a rest day!
+    if id_rest and ph_rest and my_rest:
+        # All three leagues are having a rest day!
         humor = await MatchdayService.generate_rest_day_humor(
             league="MPL",
             today_date=today,
@@ -745,7 +838,7 @@ async def cmd_today_all(message: Message, bot: Bot):
         )
 
         lines = [
-            f"🏖 <b>BUGUN TANAFFUS — MPL ID & MPL PH!</b>",
+            f"🏖 <b>BUGUN TANAFFUS — MPL ID, PH & MY!</b>",
             f"🗓 <i>Sana: {today_display}</i>",
             "",
             f"<i>{humor}</i>",
@@ -767,12 +860,19 @@ async def cmd_today_all(message: Message, bot: Bot):
                 m_time = m.get("time", "").split(" / ")[0].replace("(UZ)", "").strip()
                 lines.append(f"• <b>{m['team_a']} vs {m['team_b']}</b> — ⏰ {m_time}")
 
-        lines.append("\n#MPLID #MPLPH #MLBB @murodalievgg")
+        next_my = res_my.get("next_matchday")
+        if next_my and next_my.get("matches"):
+            lines.append(f"\n🇲🇾 <b>MPL MY ({next_my.get('date_display')}):</b>")
+            for m in next_my["matches"]:
+                m_time = m.get("time", "").split(" / ")[0].replace("(UZ)", "").strip()
+                lines.append(f"• <b>{m['team_a']} vs {m['team_b']}</b> — ⏰ {m_time}")
+
+        lines.append("\n#MPLID #MPLPH #MPLMY #MLBB @murodalievgg")
 
         await message.reply("\n".join(lines), parse_mode="HTML")
         return
 
-    # If one or both have games today
+    # If one or more have games today
     status_lines = [
         "📅 <b>BUGUNGI O‘YINLAR DASTURI</b>",
         f"🗓 <i>Sana: {today_display}</i>\n"
@@ -786,6 +886,11 @@ async def cmd_today_all(message: Message, bot: Bot):
         status_lines.append("🇵🇭 <b>MPL Philippines:</b> Bugun dam olish kuni! 🏖 (/today_ph)")
     else:
         status_lines.append("🇵🇭 <b>MPL Philippines:</b> Bugun o‘yinlar bor! 🔥 (/today_ph)")
+
+    if my_rest:
+        status_lines.append("🇲🇾 <b>MPL Malaysia:</b> Bugun dam olish kuni! 🏖 (/today_my)")
+    else:
+        status_lines.append("🇲🇾 <b>MPL Malaysia:</b> Bugun o‘yinlar bor! 🔥 (/today_my)")
 
     status_lines.append("\nBatafsil jadval va kartani ko‘rish uchun yuqoridagi buyruqlarni bosing!")
     await message.reply("\n".join(status_lines), parse_mode="HTML")
@@ -868,6 +973,46 @@ async def cmd_today_ph(message: Message, bot: Bot):
             await message.reply(safe_trim_html(res["caption"], max_len=4000), parse_mode="HTML")
     except Exception as e:
         logger.error(f"Error in cmd_today_ph: {e}", exc_info=True)
+        await message.reply(f"❌ Xatolik yuz berdi: {e}")
+
+
+@bot_router.message(Command("today_my"))
+async def cmd_today_my(message: Message, bot: Bot):
+    """
+    Generates and returns today's MPL MY Matchday Broadcast Card or witty Rest Day message.
+    """
+    await message.reply("🎨 <i>MPL Malaysia bugungi holati tekshirilmoqda...</i>", parse_mode="HTML")
+    from app.services.matchday_service import MatchdayService
+    from app.ai.analyzer import AIAnalyzer
+    from app.utils.html_utils import safe_trim_html
+    from aiogram.types import BufferedInputFile
+
+    try:
+        analyzer = AIAnalyzer()
+        res = await MatchdayService.generate_matchday_post("MPL MY", analyzer=analyzer)
+        if not res.get("success"):
+            await message.reply(res.get("message") or "O‘yinlar topilmadi.")
+            return
+
+        if res.get("is_rest_day"):
+            await message.reply(res["caption"], parse_mode="HTML")
+            return
+
+        caption = safe_trim_html(res["caption"], max_len=1020)
+        photo = BufferedInputFile(res["image_bytes"], filename="matchday_mpl_my.png")
+
+        try:
+            await message.reply_photo(
+                photo=photo,
+                caption=caption,
+                parse_mode="HTML"
+            )
+        except Exception as photo_err:
+            logger.warning(f"Reply matchday photo failed ({photo_err}), sending fallback")
+            await message.reply_photo(photo=photo, caption="🇲🇾 <b>MPL MALAYSIA • BUGUNGI O‘YINLAR DASTURI</b>", parse_mode="HTML")
+            await message.reply(safe_trim_html(res["caption"], max_len=4000), parse_mode="HTML")
+    except Exception as e:
+        logger.error(f"Error in cmd_today_my: {e}", exc_info=True)
         await message.reply(f"❌ Xatolik yuz berdi: {e}")
 
 

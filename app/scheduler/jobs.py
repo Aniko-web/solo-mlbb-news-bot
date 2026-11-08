@@ -28,6 +28,7 @@ from app.collectors import (
     MLBBCollector,
     MPLIDCollector,
     MPLPHCollector,
+    MPLMYCollector,
     EsportsCollector
 )
 from app.ai.analyzer import AIAnalyzer
@@ -62,6 +63,7 @@ class NewsJobManager:
         self.mlbb_collector = MLBBCollector()
         self.mpl_id_collector = MPLIDCollector()
         self.mpl_ph_collector = MPLPHCollector()
+        self.mpl_my_collector = MPLMYCollector()
         self.esports_collector = EsportsCollector()
         self.fun_generator = FunContentGenerator()
 
@@ -367,7 +369,7 @@ class NewsJobManager:
                             session=session,
                             source_url=item.source_url,
                             title=f"Kutilayotgan o'yin: {team_a} vs {team_b} (AI taxmini: {pred_title})",
-                            category="MPL_ID" if "ID" in league else "MPL_PH",
+                            category="MPL_ID" if "ID" in league else ("MPL_MY" if "MY" in league else "MPL_PH"),
                             content_hash=content_hash,
                             status=PostStatus.PENDING.value,
                             raw_content=item.raw_content,
@@ -387,7 +389,7 @@ class NewsJobManager:
                         else:
                             await self.admin_notifier.send_approval_request(
                                 post_id=db_post.id,
-                                category="MPL_ID" if "ID" in league else "MPL_PH",
+                                category="MPL_ID" if "ID" in league else ("MPL_MY" if "MY" in league else "MPL_PH"),
                                 formatted_post=formatted_post,
                                 image_bytes=image_bytes
                             )
@@ -419,7 +421,7 @@ class NewsJobManager:
                             session=session,
                             source_url=item.source_url,
                             title=f"Natija: {team_a} {score_a} - {score_b} {team_b}",
-                            category="MPL_ID" if "ID" in league else "MPL_PH",
+                            category="MPL_ID" if "ID" in league else ("MPL_MY" if "MY" in league else "MPL_PH"),
                             content_hash=content_hash,
                             status=PostStatus.PENDING.value,
                             raw_content=item.raw_content,
@@ -439,7 +441,7 @@ class NewsJobManager:
                         else:
                             await self.admin_notifier.send_approval_request(
                                 post_id=db_post.id,
-                                category="MPL_ID" if "ID" in league else "MPL_PH",
+                                category="MPL_ID" if "ID" in league else ("MPL_MY" if "MY" in league else "MPL_PH"),
                                 formatted_post=formatted_post,
                                 image_bytes=image_bytes
                             )
@@ -484,12 +486,13 @@ class NewsJobManager:
         """
         await self.process_match_collector(self.mpl_id_collector, "MPL ID")
         await self.process_match_collector(self.mpl_ph_collector, "MPL PH")
+        await self.process_match_collector(self.mpl_my_collector, "MPL MY")
         await self.job_check_matchday_schedules()
 
     async def job_check_matchday_schedules(self):
         """
         Daily Matchday Schedule Announcement:
-        If today has matches scheduled for MPL ID or MPL PH:
+        If today has matches scheduled for MPL ID, MPL PH, or MPL MY:
         - Renders high-impact broadcast Matchday Card with all today's matches.
         - Identifies Match of the Day (Kunning eng muhim o'yini).
         - Generates exciting AI hype commentary.
@@ -499,7 +502,7 @@ class NewsJobManager:
             return
 
         today = MatchdayService.get_current_date_tashkent()
-        for league in ["MPL ID", "MPL PH"]:
+        for league in ["MPL ID", "MPL PH", "MPL MY"]:
             try:
                 date_str, matches, is_rest_day, next_matchday = await MatchdayService.get_matches_for_day(league=league, target_date=today)
                 if date_str != today:
@@ -531,14 +534,14 @@ class NewsJobManager:
                     if image_bytes:
                         generated_dir = os.path.join(os.getcwd(), "assets", "generated")
                         os.makedirs(generated_dir, exist_ok=True)
-                        league_slug = "mpl_id" if "ID" in league else "mpl_ph"
+                        league_slug = "mpl_id" if "ID" in league else ("mpl_my" if "MY" in league else "mpl_ph")
                         card_filename = f"matchday_{league_slug}_{today}.png"
                         card_path = os.path.join(generated_dir, card_filename)
                         with open(card_path, "wb") as f:
                             f.write(image_bytes)
 
                     status = PostStatus.PUBLISHED.value if settings.AUTO_PUBLISH else PostStatus.PENDING.value
-                    category = "MPL_ID" if "ID" in league else "MPL_PH"
+                    category = "MPL_ID" if "ID" in league else ("MPL_MY" if "MY" in league else "MPL_PH")
                     post_title = f"Bugun dam olish kuni: {league} ({today})" if is_rest_day else f"Bugungi o'yinlar dasturi: {league} ({today})"
 
                     db_post = await PostRepository.create_post(
@@ -589,6 +592,9 @@ class NewsJobManager:
 
     async def job_mpl_ph(self) -> int:
         return await self.process_match_collector(self.mpl_ph_collector, "MPL PH")
+
+    async def job_mpl_my(self) -> int:
+        return await self.process_match_collector(self.mpl_my_collector, "MPL MY")
 
     async def job_esports(self) -> int:
         return await self.process_news_collector(self.esports_collector, "Esports", max_items=settings.MAX_DAILY_NEWS_COUNT)

@@ -86,6 +86,43 @@ PH_TEAM_NAME_MAP = {
     "BLCK": "BLACKLIST INT.",
 }
 
+MY_TEAM_NAME_MAP = {
+    "SRG": "SELANGOR RED GIANTS",
+    "SRG.OG": "SELANGOR RED GIANTS",
+    "SELANGOR RED GIANTS": "SELANGOR RED GIANTS",
+    "SELANGOR": "SELANGOR RED GIANTS",
+    "HB": "HOMEBOIS",
+    "HOMEBOIS": "HOMEBOIS",
+    "VMS": "TEAM VAMOS",
+    "VAMOS": "TEAM VAMOS",
+    "TEAM VAMOS": "TEAM VAMOS",
+    "TDK": "TODAK",
+    "TODAK": "TODAK",
+    "MV": "MONSTER VICIOUS",
+    "MONSTER VICIOUS": "MONSTER VICIOUS",
+    "THQ": "TEAM HAQ",
+    "TEAM HAQ": "TEAM HAQ",
+    "HAQ": "TEAM HAQ",
+    "JPN": "JP NINERS",
+    "JP NINERS": "JP NINERS",
+    "NINERS": "JP NINERS",
+    "REY": "TEAM REY",
+    "TEAM REY": "TEAM REY",
+    "CG": "CG ESPORTS",
+    "CG ESPORTS": "CG ESPORTS",
+    "UNT": "UNTITLED ESPORTS",
+    "UNTITLED": "UNTITLED ESPORTS",
+    "UNTITLED ESPORTS": "UNTITLED ESPORTS",
+    "AERO": "AERO ESPORTS",
+    "AERO ESPORTS": "AERO ESPORTS",
+    "GMXK": "GAMESMY KELANTAN",
+    "GAMESMY KELANTAN": "GAMESMY KELANTAN",
+    "KEL": "KING EMPIRE",
+    "KING EMPIRE": "KING EMPIRE",
+    "OB": "OCEAN BLACK",
+    "OCEAN BLACK": "OCEAN BLACK",
+}
+
 UZ_MONTHS = {
     "01": "yanvar", "02": "fevral", "03": "mart", "04": "aprel",
     "05": "may", "06": "iyun", "07": "iyul", "08": "avgust",
@@ -132,6 +169,11 @@ class LiquipediaParserService:
                 return mapped
             if "ONIC" in upper:
                 return "ONIC PH"
+            return clean
+        elif "MY" in league:
+            mapped = MY_TEAM_NAME_MAP.get(upper) or MY_TEAM_NAME_MAP.get(upper_stripped)
+            if mapped:
+                return mapped
             return clean
         else:
             mapped = ID_TEAM_NAME_MAP.get(upper) or ID_TEAM_NAME_MAP.get(upper_stripped)
@@ -242,12 +284,17 @@ class LiquipediaParserService:
 
         # Format with Tashkent time
         is_ph = "PH" in league.upper()
+        is_my = "MY" in league.upper()
         try:
             h, m = map(int, raw_time.split(":"))
             if is_ph:
                 # PHT is UTC+8, Tashkent is UTC+5 (-3 hours)
                 tashkent_h = (h - 3) % 24
                 formatted_time = f"{tashkent_h:02d}:{m:02d} (UZ) / {raw_time} (PHT)"
+            elif is_my:
+                # MYT is UTC+8, Tashkent is UTC+5 (-3 hours)
+                tashkent_h = (h - 3) % 24
+                formatted_time = f"{tashkent_h:02d}:{m:02d} (UZ) / {raw_time} (MYT)"
             else:
                 # WIB is UTC+7, Tashkent is UTC+5 (-2 hours)
                 tashkent_h = (h - 2) % 24
@@ -407,6 +454,46 @@ class LiquipediaParserService:
                             m.time = f"{tashkent_time} (UZ) / {pht_time} (PHT)"
 
             logger.info(f"[Liquipedia] Successfully parsed {len(matches)} MPL PH matches from Liquipedia.")
+            return matches
+
+    @classmethod
+    async def fetch_and_parse_mpl_my(cls, season: int = 16) -> List[MatchItem]:
+        """Fetch and parse all official MPL MY matches from Liquipedia."""
+        season_str = f"Season {season}"
+        logger.info(f"[Liquipedia] Fetching MPL MY {season_str} from {API_BASE}...")
+
+        async with httpx.AsyncClient(headers=HEADERS, follow_redirects=True, timeout=25.0) as client:
+            # 1. Fetch upcoming match-infos with timestamps
+            upcoming_infos = await cls._fetch_upcoming_match_infos(client, f"MPL/Malaysia/Season_{season}")
+
+            # 2. Fetch full Regular Season wikitext
+            subpage = f"MPL/Malaysia/Season_{season}/Regular_Season"
+            wikitext = await cls._fetch_page_wikitext(client, subpage)
+            if not wikitext:
+                wikitext = await cls._fetch_page_wikitext(client, f"MPL/Malaysia/Season_{season}")
+
+            if not wikitext:
+                logger.warning(f"[Liquipedia] Could not fetch wikitext for MPL MY {season_str}")
+                return []
+
+            matches = cls._parse_wikitext_matches(wikitext, "MPL MY", season_str)
+
+            # 3. Enhance matches with timestamps from upcoming_infos
+            for m in matches:
+                for ui in upcoming_infos:
+                    u_t1 = cls.normalize_team(ui.get("team_a_short", ""), "MPL MY")
+                    u_t2 = cls.normalize_team(ui.get("team_b_short", ""), "MPL MY")
+                    if (u_t1 in m.team_a or m.team_a in u_t1) and (u_t2 in m.team_b or m.team_b in u_t2):
+                        if ui.get("timestamp"):
+                            ts = ui["timestamp"]
+                            dt_utc = datetime.fromtimestamp(ts, tz=timezone.utc)
+                            dt_tashkent = dt_utc + timedelta(hours=5)
+                            m.date = dt_tashkent.strftime("%Y-%m-%d")
+                            tashkent_time = dt_tashkent.strftime("%H:%M")
+                            myt_time = (dt_utc + timedelta(hours=8)).strftime("%H:%M")
+                            m.time = f"{tashkent_time} (UZ) / {myt_time} (MYT)"
+
+            logger.info(f"[Liquipedia] Successfully parsed {len(matches)} MPL MY matches from Liquipedia.")
             return matches
 
     @classmethod
