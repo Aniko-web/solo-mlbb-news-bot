@@ -503,22 +503,10 @@ class MatchdayService:
         """
         date_str, matches, is_rest_day, next_matchday = await cls.get_matches_for_day(league, target_date)
 
-        if is_rest_day:
+        if is_rest_day or not matches:
             date_display = cls.format_uzbek_date_header(date_str)
-            humor = await cls.generate_rest_day_humor(
-                league=league,
-                today_date=date_str,
-                next_matchday=next_matchday,
-                analyzer=analyzer
-            )
-            caption = cls.format_rest_day_caption(
-                league=league,
-                today_date=date_str,
-                next_matchday=next_matchday,
-                humor_text=humor
-            )
             return {
-                "success": True,
+                "success": False,
                 "is_rest_day": True,
                 "league": league,
                 "date": date_str,
@@ -526,8 +514,8 @@ class MatchdayService:
                 "matches": [],
                 "motd": {},
                 "image_bytes": None,
-                "caption": caption,
-                "message": caption,
+                "caption": None,
+                "message": f"Bugun {league} ligasida rasmiy o‘yinlar yo‘q (dam olish kuni).",
                 "next_matchday": next_matchday
             }
 

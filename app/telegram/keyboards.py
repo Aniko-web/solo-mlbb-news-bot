@@ -142,3 +142,4 @@ async def setup_bot_commands(bot: Bot):
             await bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin_id))
         except Exception as e:
             logger.debug(f"Could not set commands for admin {admin_id}: {e}")
+

@@ -848,19 +848,11 @@ async def cmd_today_all(message: Message, bot: Bot):
     my_rest = res_my.get("is_rest_day", False)
 
     if id_rest and ph_rest and my_rest:
-        # All three leagues are having a rest day!
-        humor = await MatchdayService.generate_rest_day_humor(
-            league="MPL",
-            today_date=today,
-            next_matchday=res_id.get("next_matchday"),
-            analyzer=analyzer
-        )
-
+        # Barcha ligalarda bugun o'yinlar yo'q
         lines = [
-            f"🏖 <b>BUGUN TANAFFUS — MPL ID, PH & MY!</b>",
-            f"🗓 <i>Sana: {today_display}</i>",
+            f"ℹ️ <b>BUGUNGI HOLAT ({today_display})</b>",
             "",
-            f"<i>{humor}</i>",
+            "Bugun barcha arenalarda (MPL ID, MPL PH, MPL MY) rasmiy o‘yinlar yo‘q.",
             "",
             "📅 <b>KEYINGI O‘YINLAR:</b>"
         ]
@@ -868,25 +860,23 @@ async def cmd_today_all(message: Message, bot: Bot):
         next_id = res_id.get("next_matchday")
         if next_id and next_id.get("matches"):
             lines.append(f"\n🇮🇩 <b>MPL ID ({next_id.get('date_display')}):</b>")
-            for m in next_id["matches"]:
+            for m in next_id["matches"][:3]:
                 m_time = m.get("time", "").split(" / ")[0].replace("(UZ)", "").strip()
                 lines.append(f"• <b>{m['team_a']} vs {m['team_b']}</b> — ⏰ {m_time}")
 
         next_ph = res_ph.get("next_matchday")
         if next_ph and next_ph.get("matches"):
             lines.append(f"\n🇵🇭 <b>MPL PH ({next_ph.get('date_display')}):</b>")
-            for m in next_ph["matches"]:
+            for m in next_ph["matches"][:3]:
                 m_time = m.get("time", "").split(" / ")[0].replace("(UZ)", "").strip()
                 lines.append(f"• <b>{m['team_a']} vs {m['team_b']}</b> — ⏰ {m_time}")
 
         next_my = res_my.get("next_matchday")
         if next_my and next_my.get("matches"):
             lines.append(f"\n🇲🇾 <b>MPL MY ({next_my.get('date_display')}):</b>")
-            for m in next_my["matches"]:
+            for m in next_my["matches"][:3]:
                 m_time = m.get("time", "").split(" / ")[0].replace("(UZ)", "").strip()
                 lines.append(f"• <b>{m['team_a']} vs {m['team_b']}</b> — ⏰ {m_time}")
-
-        lines.append("\n#MPLID #MPLPH #MPLMY #MLBB @murodalievgg")
 
         await message.reply("\n".join(lines), parse_mode="HTML")
         return
@@ -933,8 +923,19 @@ async def cmd_today_id(message: Message, bot: Bot):
             await message.reply(res.get("message") or "O‘yinlar topilmadi.")
             return
 
-        if res.get("is_rest_day"):
-            await message.reply(res["caption"], parse_mode="HTML")
+        if res.get("is_rest_day") or not res.get("matches"):
+            next_md = res.get("next_matchday")
+            next_info = ""
+            if next_md and next_md.get("matches"):
+                next_date = next_md.get("date_display") or next_md.get("date")
+                next_info = f"\n\n📅 <b>Keyingi o‘yinlar ({next_date}):</b>\n"
+                for m in next_md["matches"][:3]:
+                    m_time = m.get("time", "").split(" / ")[0].replace("(UZ)", "").strip()
+                    next_info += f"• <b>{m['team_a']} vs {m['team_b']}</b> — ⏰ {m_time}\n"
+            await message.reply(
+                f"ℹ️ <b>Bugun MPL Indonesia ligasida rasmiy o‘yinlar yo‘q.</b>{next_info}",
+                parse_mode="HTML"
+            )
             return
 
         caption = safe_trim_html(res["caption"], max_len=1020)
@@ -973,8 +974,19 @@ async def cmd_today_ph(message: Message, bot: Bot):
             await message.reply(res.get("message") or "O‘yinlar topilmadi.")
             return
 
-        if res.get("is_rest_day"):
-            await message.reply(res["caption"], parse_mode="HTML")
+        if res.get("is_rest_day") or not res.get("matches"):
+            next_md = res.get("next_matchday")
+            next_info = ""
+            if next_md and next_md.get("matches"):
+                next_date = next_md.get("date_display") or next_md.get("date")
+                next_info = f"\n\n📅 <b>Keyingi o‘yinlar ({next_date}):</b>\n"
+                for m in next_md["matches"][:3]:
+                    m_time = m.get("time", "").split(" / ")[0].replace("(UZ)", "").strip()
+                    next_info += f"• <b>{m['team_a']} vs {m['team_b']}</b> — ⏰ {m_time}\n"
+            await message.reply(
+                f"ℹ️ <b>Bugun MPL Philippines ligasida rasmiy o‘yinlar yo‘q.</b>{next_info}",
+                parse_mode="HTML"
+            )
             return
 
         caption = safe_trim_html(res["caption"], max_len=1020)
@@ -1013,8 +1025,19 @@ async def cmd_today_my(message: Message, bot: Bot):
             await message.reply(res.get("message") or "O‘yinlar topilmadi.")
             return
 
-        if res.get("is_rest_day"):
-            await message.reply(res["caption"], parse_mode="HTML")
+        if res.get("is_rest_day") or not res.get("matches"):
+            next_md = res.get("next_matchday")
+            next_info = ""
+            if next_md and next_md.get("matches"):
+                next_date = next_md.get("date_display") or next_md.get("date")
+                next_info = f"\n\n📅 <b>Keyingi o‘yinlar ({next_date}):</b>\n"
+                for m in next_md["matches"][:3]:
+                    m_time = m.get("time", "").split(" / ")[0].replace("(UZ)", "").strip()
+                    next_info += f"• <b>{m['team_a']} vs {m['team_b']}</b> — ⏰ {m_time}\n"
+            await message.reply(
+                f"ℹ️ <b>Bugun MPL Malaysia ligasida rasmiy o‘yinlar yo‘q.</b>{next_info}",
+                parse_mode="HTML"
+            )
             return
 
         caption = safe_trim_html(res["caption"], max_len=1020)

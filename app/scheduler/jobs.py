@@ -508,10 +508,14 @@ class NewsJobManager:
                 if date_str != today:
                     continue
 
-                prefix = "RESTDAY" if is_rest_day else "MATCHDAY"
+                # Dam olish kunlarida (o'yinlar bo'lmaganda) xabar yuborilmaydi
+                if is_rest_day or not matches:
+                    logger.debug(f"[{league}] Bugun dam olish kuni ({today}). O'yinlar yo'qligi sababli post yaratilmaydi.")
+                    continue
+
                 content_hash = generate_content_hash(
-                    title=f"{prefix}:{league}:{today}",
-                    content=f"{prefix.lower()}_{league}_{today}"
+                    title=f"MATCHDAY:{league}:{today}",
+                    content=f"matchday_{league}_{today}"
                 )
 
                 async with get_session() as session:
@@ -524,7 +528,7 @@ class NewsJobManager:
                         target_date=today,
                         analyzer=self.analyzer
                     )
-                    if not post_payload.get("success"):
+                    if not post_payload.get("success") or not post_payload.get("matches"):
                         continue
 
                     image_bytes = post_payload.get("image_bytes")
@@ -542,7 +546,7 @@ class NewsJobManager:
 
                     status = PostStatus.PUBLISHED.value if settings.AUTO_PUBLISH else PostStatus.PENDING.value
                     category = "MPL_ID" if "ID" in league else ("MPL_MY" if "MY" in league else "MPL_PH")
-                    post_title = f"Bugun dam olish kuni: {league} ({today})" if is_rest_day else f"Bugungi o'yinlar dasturi: {league} ({today})"
+                    post_title = f"Bugungi o'yinlar dasturi: {league} ({today})"
 
                     db_post = await PostRepository.create_post(
                         session=session,
