@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from typing import Optional, Dict
 from aiogram import Bot, Dispatcher, Router, F
@@ -360,7 +361,31 @@ async def handle_my_chat_member(update: ChatMemberUpdated, bot: Bot):
     """Triggered when bot is added to a channel/group or its permissions change."""
     chat = update.chat
     new_status = update.new_chat_member.status
-    if chat.type in ["channel", "supergroup"]:
+
+    # 1. When added to a group or supergroup
+    if chat.type in ["group", "supergroup"]:
+        if new_status in ["member", "administrator"]:
+            welcome_text = (
+                "👋 <b>Assalomu alaykum! Men guruhga muvaffaqiyatli qo‘shildim.</b>\n\n"
+                "Endi ushbu guruhdagi barcha a'zolar Mobile Legends bo‘yicha istalgan qahramonga qarshi eng kuchli counter-picklarni bilishi mumkin!\n\n"
+                "🛡️ <b>Qanday ishlatiladi:</b>\n"
+                "• <code>/counter Granger</code>\n"
+                "• <code>/counter Fanny</code>\n"
+                "• <code>/counter Ling</code>\n\n"
+                "Istalgan qahramon nomini yozing va eng zo‘r javobni oling! ⚔️"
+            )
+            try:
+                await bot.send_message(
+                    chat_id=chat.id,
+                    text=welcome_text,
+                    parse_mode="HTML"
+                )
+                logger.info(f"Sent welcome counter-pick guide to group '{chat.title}' ({chat.id})")
+            except Exception as e:
+                logger.warning(f"Could not send welcome message to group {chat.id}: {e}")
+
+    # 2. When added to a channel as administrator
+    elif chat.type == "channel":
         if new_status == "administrator":
             from app.telegram.admin import get_effective_admin_ids
             admins = await get_effective_admin_ids()
@@ -515,15 +540,53 @@ async def handle_numeric_id_query(message: Message, bot: Bot):
         )
 
 
+def extract_hero_query_from_text(raw_text: str, bot_username: str = "") -> str:
+    """
+    Extracts hero name from various message formats in private chats and groups:
+    - /counter Granger or /counter@bot Granger
+    - @bot counter Granger or @bot Granger
+    - !counter Granger, #counter Granger
+    - counter Granger, kontr Fanny, kontra Chou
+    """
+    raw = (raw_text or "").strip()
+    if not raw:
+        return ""
+
+    if bot_username:
+        bot_tag_pattern = rf"@\b{re.escape(bot_username)}\b"
+        raw = re.sub(bot_tag_pattern, "", raw, flags=re.IGNORECASE).strip()
+
+    prefix_pattern = r"^(?:[/\!#])?(?:counter|counterpick|cp|kontr|kontra)\b\s*"
+    m = re.match(prefix_pattern, raw, flags=re.IGNORECASE)
+    if m:
+        raw = raw[m.end():].strip()
+
+    return raw
+
+
 @bot_router.message(Command("counter", "counterpick", "cp"))
+@bot_router.message(F.text.regexp(r"(?i)^(?:[/\!#])?(?:counter|counterpick|cp|kontr|kontra)\b"))
+@bot_router.message(F.text.regexp(r"(?i)^@\w+\s+(?:counter\s+)?([a-zA-Z\s'\.\-]+)$"))
 async def cmd_counter_pick(message: Message, bot: Bot):
     """
     Looks up official mlbb.io counter-pick recommendations for any MLBB hero.
-    Usage: /counter Granger or /counter
+    Works for ALL users in private chats and groups (e.g. group 2152853968).
     """
     text = (message.text or "").strip()
-    parts = text.split(maxsplit=1)
-    hero_query = parts[1].strip() if len(parts) > 1 else ""
+    bot_username = ""
+    try:
+        bot_info = await bot.get_me()
+        bot_username = bot_info.username or ""
+    except Exception:
+        pass
+
+    hero_query = extract_hero_query_from_text(text, bot_username)
+
+    # If user sent just /counter as a reply to another message containing a hero name
+    if not hero_query and message.reply_to_message and message.reply_to_message.text:
+        reply_candidate = message.reply_to_message.text.strip()
+        if len(reply_candidate) < 30 and not reply_candidate.startswith("/"):
+            hero_query = reply_candidate
 
     if not hero_query:
         guide_text = (
@@ -569,6 +632,26 @@ async def cmd_counter_pick(message: Message, bot: Bot):
         parse_mode="HTML",
         link_preview_options=LinkPreviewOptions(is_disabled=False, url=data["url"], prefer_large_media=True)
     )
+
+
+@bot_router.message(F.reply_to_message & F.text)
+async def handle_reply_hero_query(message: Message, bot: Bot):
+    """If user replies directly to any bot message with just a hero name in groups or private chats."""
+    if not message.reply_to_message.from_user or not message.reply_to_message.from_user.is_bot:
+        return
+    text = (message.text or "").strip()
+    if text.startswith("/") or len(text) > 25:
+        return
+
+    from app.services.counter_pick_service import CounterPickService
+    data = await CounterPickService.get_counter_data(text)
+    if data:
+        formatted_msg = CounterPickService.format_counter_message(data)
+        await message.reply(
+            formatted_msg,
+            parse_mode="HTML",
+            link_preview_options=LinkPreviewOptions(is_disabled=False, url=data["url"], prefer_large_media=True)
+        )
 
 
 @bot_router.message(Command("pause"))
