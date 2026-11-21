@@ -8,7 +8,8 @@ from aiogram.types import (
     MessageOriginChannel,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
-    CallbackQuery
+    CallbackQuery,
+    LinkPreviewOptions
 )
 from aiogram.client.default import DefaultBotProperties
 
@@ -64,6 +65,7 @@ async def cmd_start(message: Message):
         "qahramonlar balansi, yangi skinlar va MPL ID/PH/MY o‘yin natijalarini kuzatib boruvchi AI agentman.\n\n"
         f"🆔 <b>Sizning Telegram ID:</b> <code>{user_id}</code>\n\n"
         "📌 <b>Asosiy buyruqlar:</b>\n"
+        "/counter &lt;hero&gt; — 🛡️ Qahramonga qarshi eng kuchli counter-pick (mlbb.io)\n"
         "/status — Tizim holatini ko‘rish\n"
         "/latest — So‘nggi yangiliklar\n"
         "/test — Test xabarni tekshirish\n"
@@ -76,6 +78,7 @@ async def cmd_start(message: Message):
             "\n👑 <b>Administrator Boshqaruv Markazi</b>\n"
             "Ekranning pastki qismidagi menyu tugmalari orqali barcha buyruqlarni 1 bosishda bajarishingiz mumkin!\n"
             "To‘liq interaktiv boshqaruv paneli uchun: /admin\n\n"
+            "• 🛡️ /counter &lt;nomi&gt; — mlbb.io counter-pick tahlili\n"
             "• 📊 /status — Tizim holati va statistika\n"
             "• ⚔️ /today — Bugungi barcha o‘yinlar dasturi\n"
             "• 🇲🇾 /mpl_my — MPL Malaysia jadvali va kartasi\n"
@@ -510,6 +513,62 @@ async def handle_numeric_id_query(message: Message, bot: Bot):
             "💡 <b>Maslahat:</b> Botingizni kanalga Admin qilib qo‘shing va kanaldan birorta xabarni ushbu botga forward qiling.",
             parse_mode="HTML"
         )
+
+
+@bot_router.message(Command("counter", "counterpick", "cp"))
+async def cmd_counter_pick(message: Message, bot: Bot):
+    """
+    Looks up official mlbb.io counter-pick recommendations for any MLBB hero.
+    Usage: /counter Granger or /counter
+    """
+    text = (message.text or "").strip()
+    parts = text.split(maxsplit=1)
+    hero_query = parts[1].strip() if len(parts) > 1 else ""
+
+    if not hero_query:
+        guide_text = (
+            "🛡️ <b>MLBB COUNTER-PICK YORDAMCHISI (mlbb.io)</b>\n\n"
+            "Qaysi qahramonga qarshi eng kuchli counter-pick kerakligini bilish uchun qahramon nomini yozing:\n\n"
+            "📌 <b>Foydalanish:</b>\n"
+            "<code>/counter Granger</code>\n"
+            "<code>/counter Fanny</code>\n"
+            "<code>/counter Ling</code>\n"
+            "<code>/counter Chou</code>\n\n"
+            "🌐 <i>Barcha qahramonlar counter-pick qo‘llanmasi:</i>\n"
+            "https://mlbb.io/en/counter-pick"
+        )
+        await message.reply(
+            guide_text,
+            parse_mode="HTML",
+            link_preview_options=LinkPreviewOptions(is_disabled=False, prefer_large_media=True)
+        )
+        return
+
+    wait_msg = await message.reply(f"🔍 <i>mlbb.io dan <b>{hero_query}</b> uchun eng kuchli counter-pick olinmoqda...</i>", parse_mode="HTML")
+
+    from app.services.counter_pick_service import CounterPickService
+    data = await CounterPickService.get_counter_data(hero_query)
+
+    if not data:
+        await wait_msg.edit_text(
+            f"❌ <b>'{hero_query}'</b> nomli qahramon topilmadi yoki mlbb.io dan ma'lumot olib bo‘lmadi.\n\n"
+            f"Iltimos, qahramon nomini to‘g‘ri yozganingizni tekshiring (masalan: <code>/counter Granger</code>).\n"
+            f"Barcha counterlar ro‘yxati: https://mlbb.io/en/counter-pick",
+            parse_mode="HTML"
+        )
+        return
+
+    formatted_msg = CounterPickService.format_counter_message(data)
+    try:
+        await wait_msg.delete()
+    except Exception:
+        pass
+
+    await message.reply(
+        formatted_msg,
+        parse_mode="HTML",
+        link_preview_options=LinkPreviewOptions(is_disabled=False, url=data["url"], prefer_large_media=True)
+    )
 
 
 @bot_router.message(Command("pause"))
@@ -1281,6 +1340,25 @@ async def btn_meta(message: Message, bot: Bot):
         await cmd_meta_post(message, bot)
 
 
+@bot_router.message(F.text == "🛡️ Counter Pick")
+async def btn_counter_pick(message: Message, bot: Bot):
+    guide_text = (
+        "🛡️ <b>MLBB COUNTER-PICK YORDAMCHISI (mlbb.io)</b>\n\n"
+        "Qaysi qahramonga qarshi eng kuchli counter-pick kerakligini bilish uchun <code>/counter &lt;qahramon_nomi&gt;</code> buyrug‘ini yuboring:\n\n"
+        "Misollar:\n"
+        "• <code>/counter Granger</code>\n"
+        "• <code>/counter Fanny</code>\n"
+        "• <code>/counter Ling</code>\n"
+        "• <code>/counter Chou</code>\n\n"
+        "🌐 Barcha counterlar: https://mlbb.io/en/counter-pick"
+    )
+    await message.reply(
+        guide_text,
+        parse_mode="HTML",
+        link_preview_options=LinkPreviewOptions(is_disabled=False, prefer_large_media=True)
+    )
+
+
 @bot_router.message(F.text == "🆕 Yangi Patch")
 async def btn_patch(message: Message, bot: Bot):
     user_id = message.from_user.id if message.from_user else 0
@@ -1360,6 +1438,20 @@ async def handle_admin_action_callback(callback: CallbackQuery, bot: Bot):
         from app.telegram.admin import cmd_fast_meta_post
         if msg:
             await cmd_fast_meta_post(msg, bot)
+    elif action == "counter_pick":
+        await callback.answer("Counter-pick bo‘limi...")
+        guide_text = (
+            "🛡️ <b>MLBB COUNTER-PICK (mlbb.io)</b>\n\n"
+            "Qahramonga qarshi eng yaxshi counterlarni ko‘rish uchun chatga:\n"
+            "<code>/counter &lt;qahramon_nomi&gt;</code> (masalan: <code>/counter Granger</code>) deb yozing.\n\n"
+            "🌐 https://mlbb.io/en/counter-pick"
+        )
+        if msg:
+            await msg.reply(
+                guide_text,
+                parse_mode="HTML",
+                link_preview_options=LinkPreviewOptions(is_disabled=False, prefer_large_media=True)
+            )
     elif action == "patch_preview":
         await callback.answer("Patch notes infografikasi tayyorlanmoqda...")
         from app.telegram.admin import cmd_new_patch_post

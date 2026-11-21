@@ -29,6 +29,7 @@ def get_admin_reply_keyboard() -> ReplyKeyboardMarkup:
         ],
         [
             KeyboardButton(text="👑 Meta Tier"),
+            KeyboardButton(text="🛡️ Counter Pick"),
             KeyboardButton(text="🆕 Yangi Patch")
         ],
         [
@@ -69,6 +70,7 @@ def get_admin_inline_panel(is_paused: bool = False) -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(text="👑 Meta Tier (Preview)", callback_data="admin_action:meta_preview"),
+                InlineKeyboardButton(text="🛡️ Counter Pick", callback_data="admin_action:counter_pick"),
                 InlineKeyboardButton(text="🚀 Tezkor Meta", callback_data="admin_action:meta_fast")
             ],
             [
@@ -103,6 +105,7 @@ async def setup_bot_commands(bot: Bot):
     # 1. Standart foydalanuvchilar menyusi
     user_commands = [
         BotCommand(command="start", description="🚀 Botni ishga tushirish"),
+        BotCommand(command="counter", description="🛡️ Counter-Pick (mlbb.io)"),
         BotCommand(command="status", description="📊 Tizim holati va statistika"),
         BotCommand(command="today", description="⚔️ Bugungi barcha o‘yinlar"),
         BotCommand(command="latest", description="📰 So‘nggi yangiliklar"),
@@ -125,6 +128,7 @@ async def setup_bot_commands(bot: Bot):
         BotCommand(command="mpl_id", description="🇮🇩 MPL Indonesia jadvali"),
         BotCommand(command="mpl_ph", description="🇵🇭 MPL Philippines jadvali"),
         BotCommand(command="meta", description="👑 Meta Tier list (Strong/Traps/Gems)"),
+        BotCommand(command="counter", description="🛡️ Counter-Pick qidirish (mlbb.io)"),
         BotCommand(command="fastmeta", description="🚀 Meta Tierni darhol kanalga chiqarish"),
         BotCommand(command="newpatch", description="🆕 Yangi patch infografikasi"),
         BotCommand(command="fastpatch", description="🚀 Patchni darhol kanalga chiqarish"),
