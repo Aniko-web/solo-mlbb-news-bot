@@ -58,8 +58,24 @@ def time_ago_str(dt: Optional[datetime]) -> str:
 
 @bot_router.message(Command("start"))
 async def cmd_start(message: Message):
+    chat = message.chat
     user_id = message.from_user.id if message.from_user else 0
     is_adm = await is_authorized_admin(user_id)
+
+    # In groups: simple friendly greeting, no admin commands or reply keyboard
+    if chat.type in ["group", "supergroup"]:
+        text = (
+            "👋 <b>Assalomu alaykum! Men MLBB AI yordamchisiman.</b>\n\n"
+            "Guruhda qahramonlarga qarshi eng kuchli counter-picklarni bilish uchun:\n"
+            "• <code>/counter Granger</code>\n"
+            "• <code>/counter Fanny</code>\n"
+            "• <code>/counter Ling</code>\n\n"
+            "Istalgan qahramon nomini yozing va eng zo‘r javobni oling! 🛡️"
+        )
+        await message.reply(text, parse_mode="HTML")
+        return
+
+    # In private chat:
     text = (
         "👋 <b>Assalomu alaykum! MLBB News AI Agent botiga xush kelibsiz!</b>\n\n"
         "Men Mobile Legends: Bang Bang bo‘yicha rasmiy yangiliklar, patch notes, "
@@ -72,7 +88,7 @@ async def cmd_start(message: Message):
         "/test — Test xabarni tekshirish\n"
     )
     reply_markup = None
-    if is_adm:
+    if is_adm and chat.type == "private":
         from app.telegram.keyboards import get_admin_reply_keyboard
         reply_markup = get_admin_reply_keyboard()
         text += (
@@ -96,13 +112,15 @@ async def cmd_start(message: Message):
 
 
 @bot_router.message(Command("admin"))
-async def cmd_admin_panel(message: Message):
+async def cmd_admin_panel(message: Message, bot: Bot):
+    chat = message.chat
     user_id = message.from_user.id if message.from_user else 0
     if not await is_authorized_admin(user_id):
-        await message.reply("Ruxsat berilmagan.")
+        if chat.type == "private":
+            await message.reply("Ruxsat berilmagan.")
         return
 
-    from app.telegram.keyboards import get_admin_inline_panel, get_admin_reply_keyboard
+    from app.telegram.keyboards import get_admin_inline_panel
     text = (
         "⚙️ <b>ADMIN INTERAKTIV BOSHQARUV PANELI</b>\n\n"
         "Quyidagi tugmalar orqali istalgan amalni 1 bosishda ishga tushirishingiz mumkin:\n\n"
@@ -111,6 +129,22 @@ async def cmd_admin_panel(message: Message):
         f"🇮🇩 <b>MPL ID:</b> {time_ago_str(STATE['last_checks']['MPL ID'])}\n"
         f"🇵🇭 <b>MPL PH:</b> {time_ago_str(STATE['last_checks']['MPL PH'])}"
     )
+
+    # In groups: send to private chat to protect admin privacy!
+    if chat.type in ["group", "supergroup"]:
+        try:
+            await bot.send_message(
+                chat_id=user_id,
+                text=text,
+                parse_mode="HTML",
+                reply_markup=get_admin_inline_panel(is_paused=STATE["is_paused"])
+            )
+            await message.reply("🔒 <i>Admin paneli xavfsizlik yuzasidan sizning shaxsiy chatingizga yuborildi.</i>", parse_mode="HTML")
+        except Exception:
+            await message.reply("🔒 <i>Admin paneli faqat shaxsiy chatda ochiladi: botga o‘ting.</i>", parse_mode="HTML")
+        return
+
+    # In private chat:
     await message.reply(
         text,
         parse_mode="HTML",
@@ -1465,10 +1499,10 @@ async def btn_fun(message: Message, bot: Bot):
 
 
 @bot_router.message(F.text == "⚙️ Admin Panel")
-async def btn_admin_panel(message: Message):
+async def btn_admin_panel(message: Message, bot: Bot):
     user_id = message.from_user.id if message.from_user else 0
     if await is_authorized_admin(user_id):
-        await cmd_admin_panel(message)
+        await cmd_admin_panel(message, bot)
 
 
 @bot_router.message(F.text == "📢 Kanallar")
