@@ -73,45 +73,48 @@ def extract_heroes_from_text(text: str, title: str = "") -> Dict[str, Any]:
     current_cat = None
     lines = full_text.splitlines()
 
-    for line in lines:
-        lower_line = line.lower().strip()
-        if not lower_line:
-            continue
-
-        # Detect category headers
-        if any(k in lower_line for k in ["buff:", "buffed", "[buff", "buffs", "kuchaytirildi"]):
-            current_cat = "buffs"
-        elif any(k in lower_line for k in ["nerf:", "nerfed", "[nerf", "nerfs", "zaiflashtirildi"]):
-            current_cat = "nerfs"
-        elif any(k in lower_line for k in ["revamp:", "revamped", "[revamp", "revamps", "yangilandi"]):
-            current_cat = "revamps"
-        elif any(k in lower_line for k in ["adjustment:", "adjusted", "[adjustment", "adjustments", "moslashtirildi", "hero adjustments"]):
-            current_cat = "adjustments"
-
-        # Check for heroes mentioned in this line
-        for h_key, display_name in heroes_map.items():
-            if len(h_key) < 3:
+    for raw_line in lines:
+        # Split lines that contain multiple sentences or inline category tags
+        sub_clauses = re.split(r"(?<=[.!?])\s+|\s+(?=(?:BUFF|NERF|REVAMP|ADJUSTMENT)[\s:])", raw_line, flags=re.IGNORECASE)
+        for line in sub_clauses:
+            lower_line = line.lower().strip()
+            if not lower_line:
                 continue
-            # Regex match on word boundary
-            pattern = r"(?<![a-zA-Z0-9])" + re.escape(h_key) + r"(?![a-zA-Z0-9])"
-            if re.search(pattern, lower_line):
-                # Determine category for this line
-                target_cat = current_cat
-                if any(w in lower_line for w in ["buff", "kuchaytir"]):
-                    target_cat = "buffs"
-                elif any(w in lower_line for w in ["nerf", "zaiflashtir"]):
-                    target_cat = "nerfs"
-                elif any(w in lower_line for w in ["revamp", "qayta"]):
-                    target_cat = "revamps"
-                elif any(w in lower_line for w in ["adjust", "moslash", "o'zgarish"]):
-                    target_cat = "adjustments"
 
-                if not target_cat:
-                    target_cat = "adjustments"
+            # Detect category headers
+            if any(k in lower_line for k in ["buff:", "buffed", "[buff", "buffs", "kuchaytirildi"]):
+                current_cat = "buffs"
+            elif any(k in lower_line for k in ["nerf:", "nerfed", "[nerf", "nerfs", "zaiflashtirildi"]):
+                current_cat = "nerfs"
+            elif any(k in lower_line for k in ["revamp:", "revamped", "[revamp", "revamps", "yangilandi"]):
+                current_cat = "revamps"
+            elif any(k in lower_line for k in ["adjustment:", "adjusted", "[adjustment", "adjustments", "moslashtirildi", "hero adjustments"]):
+                current_cat = "adjustments"
 
-                # Check not already in any category
-                already_added = any(display_name in result[cat] for cat in result)
-                if not already_added:
-                    result[target_cat].append(display_name)
+            # Check for heroes mentioned in this clause
+            for h_key, display_name in heroes_map.items():
+                if len(h_key) < 3:
+                    continue
+                # Regex match on word boundary
+                pattern = r"(?<![a-zA-Z0-9])" + re.escape(h_key) + r"(?![a-zA-Z0-9])"
+                if re.search(pattern, lower_line):
+                    # Determine category for this clause
+                    target_cat = current_cat
+                    if any(w in lower_line for w in ["buff:", "buffed", "[buff", "kuchaytir"]):
+                        target_cat = "buffs"
+                    elif any(w in lower_line for w in ["nerf:", "nerfed", "[nerf", "zaiflashtir"]):
+                        target_cat = "nerfs"
+                    elif any(w in lower_line for w in ["revamp:", "revamped", "[revamp", "qayta"]):
+                        target_cat = "revamps"
+                    elif any(w in lower_line for w in ["adjust", "moslash", "o'zgarish"]):
+                        target_cat = "adjustments"
+
+                    if not target_cat:
+                        target_cat = "adjustments"
+
+                    # Check not already in any category
+                    already_added = any(display_name in result[cat] for cat in result)
+                    if not already_added:
+                        result[target_cat].append(display_name)
 
     return result

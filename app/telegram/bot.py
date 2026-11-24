@@ -58,12 +58,13 @@ def time_ago_str(dt: Optional[datetime]) -> str:
 
 @bot_router.message(Command("start"))
 async def cmd_start(message: Message):
-    chat = message.chat
+    chat = getattr(message, "chat", None)
+    chat_type = getattr(chat, "type", "private") if chat else "private"
     user_id = message.from_user.id if message.from_user else 0
     is_adm = await is_authorized_admin(user_id)
 
     # In groups: simple friendly greeting, no admin commands or reply keyboard
-    if chat.type in ["group", "supergroup"]:
+    if chat_type in ["group", "supergroup"]:
         text = (
             "👋 <b>Assalomu alaykum! Men MLBB AI yordamchisiman.</b>\n\n"
             "Guruhda qahramonlarga qarshi eng kuchli counter-picklarni bilish uchun:\n"

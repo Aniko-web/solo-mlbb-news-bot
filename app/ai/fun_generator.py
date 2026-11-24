@@ -252,34 +252,45 @@ class FunContentGenerator:
         title: str,
         content: str,
         hashtags: list[str],
-        hero_name: Optional[str]
+        hero_name: Optional[str],
+        content_ru: Optional[str] = None
     ) -> str:
-        """Format caption with rich Telegram HTML styling and emojies."""
+        """Format caption with rich Telegram HTML styling and emojies in Bilingual format (UZ + RU)."""
         headers = {
-            "FACT": "💡 <b>MLBB QIZIQARLI FAKT & BILASIZMI?</b>",
-            "JOKE": "🎭 <b>MLBB HAYOTIY HAZIL & MEM</b>",
-            "MEME": "🎭 <b>MLBB HAYOTIY HAZIL & MEM</b>",
-            "LORE": "⚔️ <b>LAND OF DAWN AFSONALARI & TARIXI</b>",
-            "TIP": "🧠 <b>PRO GEYMER MASLAHATI & LAYFXAK</b>"
+            "FACT": "💡 <b>MLBB QIZIQARLI FAKT | ИНТЕРЕСНЫЙ ФАКТ MLBB</b>",
+            "JOKE": "🎭 <b>MLBB HAYOTIY HAZIL & MEM | МЕМ & ЮМОР MLBB</b>",
+            "MEME": "🎭 <b>MLBB HAYOTIY HAZIL & MEM | МЕМ & ЮМОР MLBB</b>",
+            "LORE": "⚔️ <b>LAND OF DAWN AFSONALARI | ЛОР И ИСТОРИИ ГЕРОЕВ</b>",
+            "TIP": "🧠 <b>PRO GEYMER MASLAHATI | СОВЕТ & ЛАЙФХАК</b>"
         }
-        header_text = headers.get(topic_type.upper(), "💡 <b>MLBB QIZIQARLI GEYMER POSTI</b>")
+        header_text = headers.get(topic_type.upper(), "💡 <b>MLBB QIZIQARLI GEYMER POSTI | ИНТЕРЕСНОЕ MLBB</b>")
 
         callouts = {
-            "FACT": "💬 <i>Siz bu haqida bilarmidingiz? Fikringizni izohlarda yozing!</i>",
-            "JOKE": "😂 <i>Sizda ham shunaqa katka bo'lganmi? Do'stlaringizga yuboring!</i>",
-            "MEME": "😂 <i>Sizda ham shunaqa katka bo'lganmi? Do'stlaringizga yuboring!</i>",
-            "LORE": "📖 <i>Land of Dawn olamining qaysi qahramoni tarixi sizga eng qiziq?</i>",
-            "TIP": "🎯 <i>Keyingi katkada buni albatta sinab ko'ring!</i>"
+            "FACT": "💬 <i>Siz bu haqida bilarmidingiz? / Знали ли вы об этом? Пишите в комментариях!</i>",
+            "JOKE": "😂 <i>Sizda ham shunaqa katka bo'lganmi? / Бывало ли у вас такое? Делитесь с друзьями!</i>",
+            "MEME": "😂 <i>Sizda ham shunaqa katka bo'lganmi? / Бывало ли у вас такое? Делитесь с друзьями!</i>",
+            "LORE": "📖 <i>Qaysi qahramon tarixi sizga qiziq? / История какого героя вам интереснее всего?</i>",
+            "TIP": "🎯 <i>Keyingi katkada buni sinab ko'ring! / Обязательно попробуйте в следующей катке!</i>"
         }
-        callout = callouts.get(topic_type.upper(), "💬 <i>Fikringizni izohlarda qoldiring!</i>")
+        callout = callouts.get(topic_type.upper(), "💬 <i>Fikringizni izohlarda qoldiring! / Делитесь мнением в комментариях!</i>")
 
-        tags_str = " ".join(hashtags) if hashtags else "#mlbb #murodalievgg"
+        from app.ai.translator import RussianTranslator
+        c_ru = content_ru or RussianTranslator.translate_sentence(content)
+
+        tags_str = " ".join(hashtags) if hashtags else "#mlbb #murodalievgg #mobilelegends"
         from app.ai.formatter import CHANNEL_FOOTER
+
+        bilingual_body = (
+            f"🇺🇿 <b>O‘zbekcha:</b>\n"
+            f"{content.strip()}\n\n"
+            f"🇷🇺 <b>Русский:</b>\n"
+            f"{c_ru.strip()}"
+        ) if c_ru and c_ru != content else content.strip()
 
         caption = (
             f"{header_text}\n\n"
             f"📌 <b>{title.upper()}</b>\n\n"
-            f"{content.strip()}\n\n"
+            f"{bilingual_body}\n\n"
             f"{callout}\n\n"
             f"━━━━━━━━━━━━━━━━━━\n"
             f"{tags_str}\n\n"

@@ -123,11 +123,11 @@ class MetaTierService:
         gems = categorized.get("hidden_gems", [])
 
         lines = [
-            "🔥 <b>MLBB META TAHLILI — KUNNING ENG MUHIM PIKLARI!</b>",
-            "<i>(Solo rankda yulduz ko‘tarish va asabni asrash uchun eng so‘nggi meta gidi)</i>\n",
+            "🔥 <b>MLBB META TAHLILI | АНАЛИЗ МЕТЫ MLBB</b>",
+            "<i>(Solo rank uchun eng so‘nggi meta gidi | Актуальный мета-гайд для соло ранка)</i>\n",
             "━━━━━━━━━━━━━━━━━━━━━\n",
-            "👑 <b>STRONG & SPAMMED (Metani yondirayotganlar):</b>",
-            "<i>Ushbu qahramonlar hozirda juda kuchli (OP) va har bitta o‘yinda spam qilinyapti. Ban qilmasangiz, darhol o‘zingiz oling!</i>"
+            "👑 <b>STRONG & SPAMMED (Eng kuchli qahramonlar / Топовые герои):</b>",
+            "<i>Ushbu qahramonlar juda kuchli (OP) va har bitta o‘yinda spam qilinmoqda / Эти герои сейчас крайне сильны и пикаются почти в каждой катке:</i>"
         ]
 
         for h in strong:
@@ -139,32 +139,32 @@ class MetaTierService:
             lines.append(f"• <b>{name}</b> [{tier} Tier] — <i>{lane or role}</i> (Ban: {ban:.1f}%)")
 
         lines.append("\n━━━━━━━━━━━━━━━━━━━━━\n")
-        lines.append("⚠️ <b>TRAPS TO AVOID (Tuzoq qahramonlar — aslo olmang!):</b>")
-        lines.append("<i>Ko‘pchilik odat bo‘lib qolgani uchun tanlaydi, lekin hozirgi metada yutqazib yotgan qahramonlar. Bularni olib timmeytlarni fiderlikda ayblamang! 😉</i>")
+        lines.append("⚠️ <b>TRAPS TO AVOID (Tuzoq qahramonlar / Герои-ловушки):</b>")
+        lines.append("<i>Pik qilish tavsiya etilmaydi, yutish foizi past / Не рекомендуются к пику, низкий винрейт в текущей мете:</i>")
 
         for h in traps:
             name = h.get("hero_name", "Hero")
             tier = h.get("tier", "D")
             score = h.get("score", 0)
             role = ", ".join(h.get("role", [])) if isinstance(h.get("role"), list) else str(h.get("role", ""))
-            lines.append(f"• <b>{name}</b> [{tier} Tier] — <i>{role}</i> (Zaif meta)")
+            lines.append(f"• <b>{name}</b> [{tier} Tier] — <i>{role}</i> (Zaif meta / Слабая мета)")
 
         lines.append("\n━━━━━━━━━━━━━━━━━━━━━\n")
-        lines.append("💎 <b>HIDDEN GEMS (Yashirin javohirlar — sirli qurollar):</b>")
-        lines.append("<i>Hech kim ban qilmaydi va ko‘pchilik e'tibor bermaydi, biroq solo rankda dahshatli winrate beryapti! Oling va oson yulduz yig‘ing:</i>")
+        lines.append("💎 <b>HIDDEN GEMS (Yashirin javohirlar / Скрытые имбы):</b>")
+        lines.append("<i>Kam banlanadi, lekin solo rankda yuqori winrate beryapti / Редко банят, но отлично поднимают винрейт в соло:</i>")
 
         for h in gems:
             name = h.get("hero_name", "Hero")
             tier = h.get("tier", "A")
             ban = h.get("ban_rate", 0)
             lane = ", ".join(h.get("lane", [])) if isinstance(h.get("lane"), list) else str(h.get("lane", ""))
-            lines.append(f"• <b>{name}</b> [{tier} Tier] — <i>{lane}</i> (Ban: atigi {ban:.1f}%)")
+            lines.append(f"• <b>{name}</b> [{tier} Tier] — <i>{lane}</i> (Ban: atigi / всего {ban:.1f}%)")
 
         lines.append("\n━━━━━━━━━━━━━━━━━━━━━\n")
-        lines.append("📌 <b>To‘liq ma'lumot va eng zo‘r yig‘malar (Build):</b>")
+        lines.append("📌 <b>To‘liq ma'lumot va yig‘malar / Полная информация и билды:</b>")
         lines.append(f"📊 <a href=\"{MLBB_IO_BASE}\">Mobile Legends Hero Tier List</a>")
         lines.append(f"🛡 <a href=\"{MLBB_IO_BASE}\">Mobile Legends Item Build Guide</a>\n")
-        lines.append("#MLBB #Meta #HeroTier #SoloRank @murodalievgg\n")
+        lines.append("#MLBB #Meta #HeroTier #SoloRank #Мета @murodalievgg\n")
         lines.append(CHANNEL_FOOTER)
 
         return "\n".join(lines)
