@@ -13,7 +13,7 @@ from app.utils.validators import (
 )
 from app.ai.formatter import PostFormatter
 from app.ai.summarizer import Summarizer
-from app.ai.translator import UzbekTranslator, RussianTranslator
+from app.ai.translator import UzbekTranslator
 
 settings = get_settings()
 
@@ -57,25 +57,26 @@ class AIAnalyzer:
     async def _analyze_with_llm(self, item: RawCollectedItem) -> AIPostOutput:
         system_prompt = (
             "Sen Mobile Legends: Bang Bang (MLBB) bo'yicha Telegram kanali uchun professional AI muharririsan.\n"
-            "VAZIFA: Taqdim etilgan yangilikni tahlil qilib, BITTA postda IKKI TILDA: O'ZBEK VA RUS (Bilingual) tillarida jozibali, professional va ixcham post yaratish.\n\n"
+            "VAZIFA: Taqdim etilgan yangilikni tahlil qilib, uni 100% O'ZBEK tiliga tarjima qilish va jozibali post yaratish.\n\n"
             "QAT'IY TALABLAR:\n"
-            "1. IKKI TILDA (O'zbek va Rus): Har bir xabar bitta post ichida o'zbekcha (O‘zbekcha) va ruscha (Русский) bo'limlaridan iborat bo'ladi.\n"
-            "   - O'zbekcha qismi: 100% ravon va tabiiy o'zbek tilida, MLBB atamalari bilan.\n"
-            "   - Ruscha qismi: 100% грамотный, живой русский язык для MLBB комьюнити.\n"
-            "2. IXCHAMLIK (Conciseness): Har bir tildagi tavsif 2-3 ta asosiy gapdan iborat bo'lsin. Ortiqcha gaplar va takrorlanishlar bo'lmasin.\n"
-            "3. MLBB COMMUNITY TERMINOLOGIYASI:\n"
-            "   - UZ: kuchaytirildi (buff), zaiflashtirildi (nerf), moslashtirildi (adj), qayta tiklanish vaqti (cd), zarar (dmg), olmoslar (dm).\n"
-            "   - RU: усилен (бафф), ослаблен (нерф), скорректирован, перезарядка (кд), урон, алмазы.\n"
-            "4. NO SOURCE = NO CLAIM: Manbada mavjud bo'lmagan hisoblar, o'yinchi ismlari, narxlar yoki sanalarni aslo o'ylab topma. Manbada bo'lmasa, uni ko'rsatma yoki 'Noma'lum' deb belgilash.\n"
-            "5. QAYTARILADIGAN JSON FORMATI (Faqat toza JSON qaytar):\n"
+            "1. TO'LIQ O'ZBEK TILI: Barcha matnlar (sarlavha, qisqacha tavsif, punktlar, o'zgarishlar) to'liq, ravon va tabiiy O'ZBEK tilida bo'lishi shart! Hech qanday inglizcha gap yoki qoldiq qolmasin.\n"
+            "2. MLBB COMMUNITY USLUBI: O'zbek MLBB o'yinchilari tushunadigan atamalardan foydalan:\n"
+            "   - buff -> kuchaytirildi\n"
+            "   - nerf -> zaiflashtirildi\n"
+            "   - adjustment -> moslashtirildi\n"
+            "   - cooldown -> qayta tiklanish vaqti\n"
+            "   - damage -> zarari\n"
+            "   - energy recovery -> energiya tiklanishi\n"
+            "   - basic attack -> asosiy hujum\n"
+            "   - passive / ultimate -> passiv qobiliyati / ult qobiliyati\n"
+            "   - diamonds -> olmoslar\n"
+            "3. NO SOURCE = NO CLAIM: Manbada mavjud bo'lmagan hisoblar, o'yinchi ismlari, narxlar yoki sanalarni aslo o'ylab topma. Manbada bo'lmasa, uni ko'rsatma yoki 'Noma'lum' deb belgilash.\n"
+            "4. QAYTARILADIGAN JSON FORMATI (Faqat toza JSON qaytar):\n"
             "{\n"
-            '  "category": "NEWS" | "PATCH" | "HERO" | "SKIN" | "EVENT" | "MPL_ID" | "MPL_PH" | "MPL_MY" | "ESPORTS" | "TOURNAMENT" | "OTHER",\n'
-            '  "title_uz": "O\'zbek tilidagi sarlavha",\n'
-            '  "title_ru": "Заголовок на русском языке",\n'
+            '  "category": "NEWS" | "PATCH" | "HERO" | "SKIN" | "EVENT" | "MPL_ID" | "MPL_PH" | "ESPORTS" | "TOURNAMENT" | "OTHER",\n'
+            '  "title": "O\'zbek tilidagi sarlavha",\n'
             '  "summary_uz": "Yangilikning o\'zbek tilidagi 2-3 gaplik qisqa va tushunarli tavsifi",\n'
-            '  "summary_ru": "Краткое описание новости на русском языке (2-3 предложения)",\n'
-            '  "key_points_uz": ["O\'zbek tilidagi 1-muhim nuqta", "2-muhim nuqta"],\n'
-            '  "key_points_ru": ["Ключевой пункт 1 на русском", "Ключевой пункт 2"],\n'
+            '  "key_points": ["O\'zbek tilidagi 1-muhim nuqta", "2-muhim nuqta"],\n'
             '  "confidence": 0.95,\n'
             '  "extracted_data": {\n'
             '     "hero": "...", "skin_name": "...", "price": "...", "date": "...",\n'
@@ -124,56 +125,33 @@ class AIAnalyzer:
         # Verify claims against source
         verified = verify_no_source_no_claim(item.raw_content, extracted)
 
-        # Normalize bilingual titles & summaries
-        title_uz = parsed.get("title_uz") or parsed.get("title") or UzbekTranslator.translate_sentence(item.title)
-        title_ru = parsed.get("title_ru") or RussianTranslator.translate_sentence(item.title)
-        summary_uz = parsed.get("summary_uz") or ""
-        summary_ru = parsed.get("summary_ru") or RussianTranslator.translate_sentence(summary_uz)
-        points_uz = parsed.get("key_points_uz") or parsed.get("key_points", [])
-        points_ru = parsed.get("key_points_ru") or [RussianTranslator.translate_sentence(p) for p in points_uz]
-
-        parsed["title_uz"] = title_uz
-        parsed["title_ru"] = title_ru
-        parsed["summary_uz"] = summary_uz
-        parsed["summary_ru"] = summary_ru
-        parsed["key_points_uz"] = points_uz
-        parsed["key_points_ru"] = points_ru
-
-        # Build fully Bilingual (UZ + RU) formatted post
+        # Build fully Uzbek formatted post
         formatted_post = self._build_post(category, parsed, verified, item)
 
         return AIPostOutput(
             category=category,
-            title=title_uz,
-            title_uz=title_uz,
-            title_ru=title_ru,
-            summary_uz=summary_uz,
-            summary_ru=summary_ru,
+            title=parsed.get("title", UzbekTranslator.translate_sentence(item.title)),
+            summary_uz=parsed.get("summary_uz", ""),
             formatted_post=formatted_post,
             confidence=confidence,
             image_url=item.image_url,
             source_url=item.source_url,
-            key_points=points_uz,
-            key_points_uz=points_uz,
-            key_points_ru=points_ru,
+            key_points=parsed.get("key_points", []),
             needs_review=(confidence < settings.MIN_CONFIDENCE_SCORE or item.reliability_score < settings.MIN_RELIABILITY_SCORE)
         )
 
     def _analyze_deterministic(self, item: RawCollectedItem) -> AIPostOutput:
         """
         High quality rule-based analyzer when no Gemini API key is present.
-        Ensures 100% natural Bilingual (Uzbek + Russian) translation.
+        Ensures 100% natural Uzbek translation.
         """
         category = item.category_hint or self._classify(item.title, item.raw_content)
         title_uz = UzbekTranslator.translate_sentence(item.title)
-        title_ru = RussianTranslator.translate_sentence(item.title)
         summary, bullets = Summarizer.extract_summary_and_bullets(item.raw_content)
 
-        # Localize into Uzbek & Russian
+        # Localize into Uzbek
         summary_uz = UzbekTranslator.translate_sentence(summary)
-        summary_ru = RussianTranslator.translate_sentence(summary)
-        cleaned_bullets_uz = [UzbekTranslator.translate_sentence(b) for b in bullets]
-        cleaned_bullets_ru = [RussianTranslator.translate_sentence(b) for b in bullets]
+        cleaned_bullets = [UzbekTranslator.translate_sentence(b) for b in bullets]
 
         extracted = dict(item.metadata)
         verified = verify_no_source_no_claim(item.raw_content, extracted)
@@ -185,13 +163,8 @@ class AIAnalyzer:
 
         parsed_mock = {
             "title": title_uz,
-            "title_uz": title_uz,
-            "title_ru": title_ru,
             "summary_uz": summary_uz,
-            "summary_ru": summary_ru,
-            "key_points": cleaned_bullets_uz,
-            "key_points_uz": cleaned_bullets_uz,
-            "key_points_ru": cleaned_bullets_ru
+            "key_points": cleaned_bullets
         }
 
         formatted = self._build_post(category, parsed_mock, verified, item)
@@ -201,17 +174,12 @@ class AIAnalyzer:
         return AIPostOutput(
             category=category,
             title=title_uz,
-            title_uz=title_uz,
-            title_ru=title_ru,
             summary_uz=summary_uz,
-            summary_ru=summary_ru,
             formatted_post=formatted,
             confidence=confidence,
             image_url=item.image_url,
             source_url=item.source_url,
-            key_points=cleaned_bullets_uz,
-            key_points_uz=cleaned_bullets_uz,
-            key_points_ru=cleaned_bullets_ru,
+            key_points=cleaned_bullets,
             needs_review=(confidence < settings.MIN_CONFIDENCE_SCORE or item.reliability_score < settings.MIN_RELIABILITY_SCORE)
         )
 
@@ -240,12 +208,9 @@ class AIAnalyzer:
         verified: Dict[str, Any],
         item: RawCollectedItem
     ) -> str:
-        title_uz = parsed.get("title_uz") or UzbekTranslator.translate_sentence(parsed.get("title", item.title))
-        title_ru = parsed.get("title_ru") or RussianTranslator.translate_sentence(parsed.get("title", item.title))
-        summary_uz = parsed.get("summary_uz") or UzbekTranslator.translate_sentence(parsed.get("summary", ""))
-        summary_ru = parsed.get("summary_ru") or RussianTranslator.translate_sentence(summary_uz)
-        points_uz = parsed.get("key_points_uz") or [UzbekTranslator.translate_sentence(p) for p in parsed.get("key_points", [])]
-        points_ru = parsed.get("key_points_ru") or [RussianTranslator.translate_sentence(p) for p in points_uz]
+        title = UzbekTranslator.translate_sentence(parsed.get("title", item.title))
+        summary = UzbekTranslator.translate_sentence(parsed.get("summary_uz", ""))
+        points = [UzbekTranslator.translate_sentence(p) for p in parsed.get("key_points", [])]
 
         if category == CategoryEnum.PATCH:
             # 1. Prefer structured hero data from metadata if available
@@ -281,14 +246,10 @@ class AIAnalyzer:
             version = recap_data.get("version") or verified.get("version") or item.metadata.get("version") or "1.9.xx"
 
             # Ensure summary is concise and informative
-            if not summary_uz or len(summary_uz) < 15:
-                summary_uz = (
+            if not summary or len(summary) < 15:
+                summary = (
                     f"Mobile Legends: Bang Bang da {version} versiyasi e'lon qilindi! "
                     "Ushbu yangilanishda qahramonlar ko‘nikmalari muvozanatlashtirildi, qator qahramonlar kuchaytirildi va zaiflashtirildi."
-                )
-                summary_ru = (
-                    f"В Mobile Legends: Bang Bang вышло обновление {version}! "
-                    "В этом патче скорректирован баланс навыков героев, ряд персонажей получили усиления и ослабления."
                 )
 
             return PostFormatter.format_patch(
@@ -297,14 +258,13 @@ class AIAnalyzer:
                 nerfs=nerfs,
                 adjustments=adjustments,
                 source_url=item.source_url,
-                summary=summary_uz,
-                summary_ru=summary_ru,
+                summary=summary,
                 revamps=revamps
             )
 
         elif category == CategoryEnum.SKIN:
             hero = verified.get("hero") or "Noma'lum"
-            skin_name = verified.get("skin_name") or title_uz
+            skin_name = verified.get("skin_name") or title
             raw_price = verified.get("price") or "Noma'lum (Tadbir orqali)"
             price = UzbekTranslator.translate_sentence(raw_price)
             raw_date = verified.get("date") or "Tez kunda"
@@ -315,37 +275,31 @@ class AIAnalyzer:
                 skin_name=skin_name,
                 price=price,
                 release_date=date_val,
-                description=summary_uz,
-                source_url=item.source_url,
-                description_ru=summary_ru
+                description=summary,
+                source_url=item.source_url
             )
 
         elif category == CategoryEnum.HERO:
-            hero_name = verified.get("hero") or item.metadata.get("hero") or title_uz
+            hero_name = verified.get("hero") or item.metadata.get("hero") or title
             role = verified.get("role") or item.metadata.get("role") or "Qahramon"
             role_uz = UzbekTranslator.translate_sentence(role)
             return PostFormatter.format_hero(
                 hero_name=hero_name,
                 role=role_uz,
-                description=summary_uz,
-                skills=points_uz,
-                source_url=item.source_url,
-                description_ru=summary_ru,
-                skills_ru=points_ru
+                description=summary,
+                skills=points,
+                source_url=item.source_url
             )
 
         elif category == CategoryEnum.EVENT:
             duration = verified.get("duration") or item.metadata.get("date") or "Hozirda faol"
             duration_uz = UzbekTranslator.translate_sentence(duration)
             return PostFormatter.format_event(
-                title=title_uz,
-                description=summary_uz,
-                rewards=points_uz,
+                title=title,
+                description=summary,
+                rewards=points,
                 duration=duration_uz,
-                source_url=item.source_url,
-                title_ru=title_ru,
-                description_ru=summary_ru,
-                rewards_ru=points_ru
+                source_url=item.source_url
             )
 
         elif category == CategoryEnum.MPL_ID:
@@ -372,15 +326,7 @@ class AIAnalyzer:
                     mvp=verified.get("mvp") or item.metadata.get("mvp"),
                     source_url=item.source_url
                 )
-            return PostFormatter.format_news(
-                title=title_uz,
-                summary=summary_uz,
-                key_points=points_uz,
-                source_url=item.source_url,
-                title_ru=title_ru,
-                summary_ru=summary_ru,
-                key_points_ru=points_ru
-            )
+            return PostFormatter.format_news(title, summary, points, item.source_url)
 
         elif category == CategoryEnum.MPL_PH:
             score_a = verified.get("score_a") if verified.get("score_a") is not None else item.metadata.get("score_a")
@@ -401,15 +347,7 @@ class AIAnalyzer:
                     mvp=verified.get("mvp") or item.metadata.get("mvp"),
                     source_url=item.source_url
                 )
-            return PostFormatter.format_news(
-                title=title_uz,
-                summary=summary_uz,
-                key_points=points_uz,
-                source_url=item.source_url,
-                title_ru=title_ru,
-                summary_ru=summary_ru,
-                key_points_ru=points_ru
-            )
+            return PostFormatter.format_news(title, summary, points, item.source_url)
 
         elif category == CategoryEnum.MPL_MY:
             score_a = verified.get("score_a") if verified.get("score_a") is not None else item.metadata.get("score_a")
@@ -430,35 +368,22 @@ class AIAnalyzer:
                     mvp=verified.get("mvp") or item.metadata.get("mvp"),
                     source_url=item.source_url
                 )
-            return PostFormatter.format_news(
-                title=title_uz,
-                summary=summary_uz,
-                key_points=points_uz,
-                source_url=item.source_url,
-                title_ru=title_ru,
-                summary_ru=summary_ru,
-                key_points_ru=points_ru
-            )
+            return PostFormatter.format_news(title, summary, points, item.source_url)
 
         elif category in [CategoryEnum.ESPORTS, CategoryEnum.TOURNAMENT]:
             return PostFormatter.format_esports(
-                title=title_uz,
-                summary=summary_uz,
+                title=title,
+                summary=summary,
                 tournament=verified.get("tournament"),
-                source_url=item.source_url,
-                title_ru=title_ru,
-                summary_ru=summary_ru
+                source_url=item.source_url
             )
 
         # Default NEWS
         return PostFormatter.format_news(
-            title=title_uz,
-            summary=summary_uz,
-            key_points=points_uz,
-            source_url=item.source_url,
-            title_ru=title_ru,
-            summary_ru=summary_ru,
-            key_points_ru=points_ru
+            title=title,
+            summary=summary,
+            key_points=points,
+            source_url=item.source_url
         )
 
     TEAM_POWER_RATINGS: Dict[str, int] = {
@@ -508,26 +433,24 @@ class AIAnalyzer:
     ) -> Dict[str, Any]:
         """
         Generates AI-powered match prediction, win probabilities, and PREDICTED SCORE (Taxminiy hisob)
-        for upcoming matches before they take place (bilingual commentary).
+        for upcoming matches before they take place.
         """
         if self.client:
             try:
                 system_prompt = (
                     "Sen Mobile Legends: Bang Bang (MLBB) bo'yicha professional tahlilchisan.\n"
-                    "VAZIFA: Bo'lib o'tadigan o'yin uchun AI TAXMINIY HISOB (Prediction), g'alaba ehtimoli va BITTA post uchun o'zbekcha hamda ruscha qisqa sharh tayyorla.\n"
+                    "VAZIFA: Bo'lib o'tadigan o'yin uchun AI TAXMINIY HISOB (Prediction), g'alaba ehtimoli va o'zbekcha qisqa sharh tayyorla.\n"
                     "QAT'IY QOIDALAR:\n"
                     "1. BO3 seriyasi uchun taxminiy hisob faqat 2-0, 2-1, 1-2 yoki 0-2 bo'lishi shart.\n"
                     "2. G'alaba ehtimolini foizda ko'rsat (prob_a + prob_b = 100).\n"
                     "3. commentary_uz: 1-2 ta qisqa va qiziqarli o'zbekcha jumla (draft, o'yin sur'ati, jamoaviy harakatlar haqida).\n"
-                    "4. commentary_ru: 1-2 кратких предложения на русском языке о предстоящей игре.\n"
-                    "5. Faqat quyidagi JSON formatida javob ber:\n"
+                    "4. Faqat quyidagi JSON formatida javob ber:\n"
                     "{\n"
                     '  "predicted_score_a": 2,\n'
                     '  "predicted_score_b": 1,\n'
                     '  "prob_a": 60,\n'
                     '  "prob_b": 40,\n'
-                    '  "commentary_uz": "...",\n'
-                    '  "commentary_ru": "..."\n'
+                    '  "commentary_uz": "..."\n'
                     "}"
                 )
                 user_prompt = f"Musobaqa: {league} ({season}, {week})\nJamoalar: {team_a} vs {team_b} [{series}]"
@@ -538,7 +461,7 @@ class AIAnalyzer:
                         {"role": "user", "content": user_prompt}
                     ],
                     temperature=0.7,
-                    max_tokens=220
+                    max_tokens=180
                 )
                 raw_text = response.choices[0].message.content.strip()
                 if "```json" in raw_text:
@@ -551,21 +474,16 @@ class AIAnalyzer:
                 sb = int(parsed.get("predicted_score_b", 1))
                 pa = int(parsed.get("prob_a", 55))
                 pb = int(parsed.get("prob_b", 45))
-                comm_uz = str(parsed.get("commentary_uz", "")).strip()
-                comm_ru = str(parsed.get("commentary_ru", "")).strip()
-                if not comm_uz:
+                comm = str(parsed.get("commentary_uz", "")).strip()
+                if not comm:
                     fav = team_a if sa > sb else team_b
-                    comm_uz = f"{fav} ushbu bahsda jamoaviy o'yin va draft ustunligi evaziga g'alaba qozonishi kutilmoqda."
-                if not comm_ru:
-                    comm_ru = RussianTranslator.translate_sentence(comm_uz)
-
+                    comm = f"{fav} ushbu bahsda jamoaviy o'yin va draft ustunligi evaziga g'alaba qozonishi kutilmoqda."
                 return {
                     "predicted_score_a": sa,
                     "predicted_score_b": sb,
                     "prob_a": pa,
                     "prob_b": pb,
-                    "commentary_uz": comm_uz,
-                    "commentary_ru": comm_ru
+                    "commentary_uz": comm
                 }
             except Exception as e:
                 logger.warning(f"AI match prediction via LLM failed, using deterministic rating model: {e}")
@@ -592,23 +510,20 @@ class AIAnalyzer:
         und = team_b if sa > sb else team_a
 
         if ("ONIC" in clean_a or "ONIC" in clean_b) and ("RRQ" in clean_a or "RRQ" in clean_b):
-            comm_uz = f"Klassik Royal Derby! Har ikki gigant yuqori formada, biroq {fav}ning so'nggi patchdagi barqarorligi sababli 2-1 hisobida g'alaba qozonishi kutilmoqda."
-            comm_ru = f"Классическое Royal Derby! Оба гранда в отличной форме, но за счет стабильности {fav} ожидается их победа со счетом 2-1."
+            comm = f"Klassik Royal Derby! Har ikki gigant yuqori formada, biroq {fav}ning so'nggi patchdagi barqarorligi sababli 2-1 hisobida g'alaba qozonishi kutilmoqda."
         elif abs(diff) <= 3:
-            comm_uz = f"Teng kuchlilar to'qnashuvi! {und} kamida bitta xaritani ilib ketishi aniq, biroq hal qiluvchi xaritada {fav} tajriba evaziga ustun kelishi taxmin qilinmoqda."
-            comm_ru = f"Битва равных соперников! {und} наверняка заберет одну карту, но на решающей карте {fav} должен взять верх на опыте."
-        elif (sa == 2 and sb == 0) or (sa == 0 and sb == 2):
-            comm_uz = f"{fav} hozirgi metada yuqori bosim o'tkazmoqda va {und}ga imkoniyat qoldirmasdan 2-0 hisobida g'alaba qozonishi ehtimoli yuqori."
-            comm_ru = f"{fav} доминирует в текущей мете и имеет высокие шансы закрыть серию со счетом 2-0."
+            comm = f"Teng kuchlilar to'qnashuvi! {und} kamida bitta xaritani ilib ketishi aniq, biroq hal qiluvchi xaritada {fav} tajriba evaziga ustun kelishi taxmin qilinmoqda."
+        elif sa == 2 and sb == 0:
+            comm = f"{fav} hozirgi metada yuqori bosim o'tkazmoqda va {und}ga imkoniyat qoldirmasdan 2-0 hisobida g'alaba qozonishi ehtimoli yuqori."
+        elif sa == 0 and sb == 2:
+            comm = f"{fav} hozirgi metada yuqori bosim o'tkazmoqda va {und}ga imkoniyat qoldirmasdan 2-0 hisobida g'alaba qozonishi ehtimoli yuqori."
         else:
-            comm_uz = f"Shiddatli jang kutilmoqda! {fav} draft afzalligi va yaxshiroq rotatsiya evaziga 2-1 hisobida g'alaba qozonishi kutilmoqda."
-            comm_ru = f"Ожидается напряженная борьба! {fav} имеет преимущество по драфту и ротациям для победы 2-1."
+            comm = f"Shiddatli jang kutilmoqda! {fav} draft afzalligi va yaxshiroq rotatsiya evaziga 2-1 hisobida g'alaba qozonishi kutilmoqda."
 
         return {
             "predicted_score_a": sa,
             "predicted_score_b": sb,
             "prob_a": pa,
             "prob_b": pb,
-            "commentary_uz": comm_uz,
-            "commentary_ru": comm_ru
+            "commentary_uz": comm
         }

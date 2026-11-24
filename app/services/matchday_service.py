@@ -371,26 +371,21 @@ class MatchdayService:
         motd_a = matches[best_idx]["team_a"]
         motd_b = matches[best_idx]["team_b"]
 
-        # Engaging contextual bilingual hype templates (short & punchy 1-2 sentences)
+        # Engaging contextual Uzbek hype templates (short & punchy 1-2 sentences)
         if ("ONIC" in motd_a or "ONIC" in motd_b) and ("RRQ" in motd_a or "RRQ" in motd_b):
             hype_text = f"Klassik Royal Derby! {motd_a} o‘tgan mag‘lubiyat uchun qasos olish va revansh qilishga shay!"
-            hype_text_ru = f"Классическое Royal Derby! {motd_a} полны решимости взять реванш за прошлое поражение!"
         elif "ONIC" in motd_a or "ONIC" in motd_b:
             hype_text = f"Bugun {motd_a} jamoasi {motd_b}ga qarshi o‘z qasosini olish va ochko yo‘qotmaslik uchun jangga kirishadi!"
-            hype_text_ru = f"Сегодня {motd_a} выходит на бой против {motd_b}, чтобы укрепить лидерство и не потерять очки!"
         elif "AP.BREN" in motd_a or "AP.BREN" in motd_b:
             hype_text = f"Titanlar to‘qnashuvi! {motd_a} va {motd_b} o‘rtasida murosasiz shiddatli jang kutilmoqda."
-            hype_text_ru = f"Битва титанов! Ожидается бескомпромиссная и яркая борьба между {motd_a} и {motd_b}."
         else:
             hype_text = f"Kunning eng muhim bahsi! Har ikki jamoa uchun bu to‘qnashuvda faqat g‘alaba zarur."
-            hype_text_ru = f"Главный матч дня! Обеим командам в этом противостоянии нужна только победа."
 
         return {
             "motd_index": best_idx,
             "motd_team_a": motd_a,
             "motd_team_b": motd_b,
-            "hype_text": hype_text,
-            "hype_text_ru": hype_text_ru
+            "hype_text": hype_text
         }
 
     @classmethod
@@ -402,7 +397,7 @@ class MatchdayService:
         motd_info: Dict[str, Any]
     ) -> str:
         """
-        Builds compliant, aesthetically formatted Telegram HTML caption in Bilingual format (UZ + RU).
+        Builds compliant, aesthetically formatted Telegram HTML caption.
         """
         is_my = "MY" in league.upper()
         is_ph = "PH" in league.upper()
@@ -411,10 +406,10 @@ class MatchdayService:
         hashtag = "#MPLMY" if is_my else ("#MPLPH" if is_ph else "#MPLID")
 
         lines = [
-            f"📅 <b>BUGUNGI O‘YINLAR DASTURI | РАСПИСАНИЕ МАТЧЕЙ — {league_title}</b>",
-            f"🗓 <i>Sana / Дата: {date_display}</i>",
+            f"📅 <b>BUGUNGI O‘YINLAR DASTURI — {league_title}</b>",
+            f"🗓 <i>Sana: {date_display}</i>",
             "",
-            "⚔️ <b>Bugungi to‘qnashuvlar / Сегодняшние матчи:</b>"
+            "⚔️ <b>Bugungi to‘qnashuvlar:</b>"
         ]
 
         numbers = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
@@ -429,31 +424,21 @@ class MatchdayService:
             lines.append(f"{num_emoji} <b>{m_time}</b> — <b>{ta} vs {tb}</b> [{series}]{star}")
 
         if len(matches) > 5:
-            lines.append(f"<i>...va yana {len(matches) - 5} ta qiziqarli o‘yin! / ...и еще {len(matches) - 5} матчей!</i>")
+            lines.append(f"<i>...va yana {len(matches) - 5} ta qiziqarli o‘yin!</i>")
 
         lines.append("")
-        lines.append("⭐ <b>KUNNING MARKAZIY BAHSI / МАТЧ ДНЯ:</b>")
+        lines.append("⭐ <b>KUNNING MARKAZIY BAHSI:</b>")
         lines.append(f"👑 <b>{motd_info.get('motd_team_a')} ⚔️ {motd_info.get('motd_team_b')}</b>")
         
         hype = motd_info.get("hype_text", "").strip()
-        hype_ru = motd_info.get("hype_text_ru", "").strip()
-        if not hype_ru and hype:
-            from app.ai.translator import RussianTranslator
-            tr = RussianTranslator.translate_sentence(hype)
-            hype_ru = tr if tr != hype else "Главное противостояние дня! Ожидается яркая и бескомпромиссная борьба."
-
         if hype:
-            lines.append(f"🎙 🇺🇿 <i>{hype}</i>")
-        if hype_ru:
-            lines.append(f"🎙 🇷🇺 <i>{hype_ru}</i>")
+            lines.append(f"🎙 <i>{hype}</i>")
 
         lines.append("")
-        lines.append("📺 <i>Jonli efir va o‘yin natijalarini kanalimizda kuzatib boring! / Следите за прямым эфиром и результатами на канале!</i>")
-        lines.append(f"\n{hashtag} #MLBB #Esports #Jadval #Расписание @murodalievgg\n")
+        lines.append("📺 <i>Jonli efir va o‘yin natijalarini kanalimizda kuzatib boring!</i>")
+        lines.append(f"\n{hashtag} #MLBB #Esports #Jadval @murodalievgg\n")
         from app.ai.formatter import CHANNEL_FOOTER
         lines.append(CHANNEL_FOOTER)
-
-        return "\n".join(lines)
 
         return "\n".join(lines)
 

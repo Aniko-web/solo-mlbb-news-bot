@@ -401,12 +401,14 @@ async def handle_my_chat_member(update: ChatMemberUpdated, bot: Bot):
     if chat.type in ["group", "supergroup"]:
         if new_status in ["member", "administrator"]:
             welcome_text = (
-                "👋 <b>Assalomu alaykum! Men guruhga muvaffaqiyatli qo‘shildim.</b>\n\n"
-                "Endi ushbu guruhdagi barcha a'zolar Mobile Legends bo‘yicha istalgan qahramonga qarshi eng kuchli counter-picklarni bilishi mumkin!\n\n"
-                "🛡️ <b>Qanday ishlatiladi:</b>\n"
+                "👋 <b>Assalomu alaykum! / Приветствуем!</b>\n\n"
+                "Endi ushbu guruhdagi barcha a'zolar Mobile Legends bo‘yicha istalgan qahramonga qarshi eng kuchli counter-picklarni bilishi mumkin!\n"
+                "<i>Теперь все участники группы могут мгновенно узнавать лучшие контр-пики героев MLBB!</i>\n\n"
+                "🛡️ <b>Qanday ishlatiladi / Использование:</b>\n"
                 "• <code>/counter Granger</code>\n"
                 "• <code>/counter Fanny</code>\n"
-                "• <code>/counter Ling</code>\n\n"
+                "• <code>/counter Ling</code>\n"
+                "• <code>counter Chou</code>\n\n"
                 "Istalgan qahramon nomini yozing va eng zo‘r javobni oling! ⚔️"
             )
             try:
@@ -625,14 +627,18 @@ async def cmd_counter_pick(message: Message, bot: Bot):
 
     if not hero_query:
         guide_text = (
-            "🛡️ <b>MLBB COUNTER-PICK YORDAMCHISI (mlbb.io)</b>\n\n"
-            "Qaysi qahramonga qarshi eng kuchli counter-pick kerakligini bilish uchun qahramon nomini yozing:\n\n"
-            "📌 <b>Foydalanish:</b>\n"
-            "<code>/counter Granger</code>\n"
-            "<code>/counter Fanny</code>\n"
-            "<code>/counter Ling</code>\n"
-            "<code>/counter Chou</code>\n\n"
-            "🌐 <i>Barcha qahramonlar counter-pick qo‘llanmasi:</i>\n"
+            "🛡️ <b>MLBB COUNTER-PICK YORDAMCHISI | КОНТР-ПИКИ MLBB (mlbb.io)</b>\n\n"
+            "🇺🇿 <b>O‘zbekcha:</b>\n"
+            "Qaysi qahramonga qarshi eng kuchli counter-pick kerakligini bilish uchun qahramon nomini yozing:\n"
+            "• <code>/counter Granger</code>\n"
+            "• <code>/counter Fanny</code>\n"
+            "• <code>/counter Ling</code>\n\n"
+            "🇷🇺 <b>Русский:</b>\n"
+            "Чтобы узнать лучший контр-пик против любого героя, отправьте имя героя:\n"
+            "• <code>/counter Granger</code>\n"
+            "• <code>/counter Fanny</code>\n"
+            "• <code>/counter Ling</code>\n\n"
+            "🌐 <i>Barcha qahramonlar counter-pick qo‘llanmasi / Полный список:</i>\n"
             "https://mlbb.io/en/counter-pick"
         )
         await message.reply(
@@ -642,16 +648,18 @@ async def cmd_counter_pick(message: Message, bot: Bot):
         )
         return
 
-    wait_msg = await message.reply(f"🔍 <i>mlbb.io dan <b>{hero_query}</b> uchun eng kuchli counter-pick olinmoqda...</i>", parse_mode="HTML")
+    wait_msg = await message.reply(f"🔍 <i>mlbb.io dan <b>{hero_query}</b> uchun counter-pick olinmoqda... / поиск данных...</i>", parse_mode="HTML")
 
     from app.services.counter_pick_service import CounterPickService
     data = await CounterPickService.get_counter_data(hero_query)
 
     if not data:
         await wait_msg.edit_text(
-            f"❌ <b>'{hero_query}'</b> nomli qahramon topilmadi yoki mlbb.io dan ma'lumot olib bo‘lmadi.\n\n"
-            f"Iltimos, qahramon nomini to‘g‘ri yozganingizni tekshiring (masalan: <code>/counter Granger</code>).\n"
-            f"Barcha counterlar ro‘yxati: https://mlbb.io/en/counter-pick",
+            f"❌ <b>'{hero_query}'</b> nomli qahramon topilmadi yoki mlbb.io dan ma'lumot olib bo‘lmadi.\n"
+            f"<i>Герой не найден или не удалось получить данные с mlbb.io.</i>\n\n"
+            f"📌 <b>Qahramon nomini to‘g‘ri yozganingizni tekshiring / Проверьте имя героя:</b>\n"
+            f"Masalan / Например: <code>/counter Granger</code>\n\n"
+            f"🌐 https://mlbb.io/en/counter-pick",
             parse_mode="HTML"
         )
         return

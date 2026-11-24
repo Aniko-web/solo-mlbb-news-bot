@@ -1,7 +1,6 @@
 from typing import Dict, Any, List, Optional
 from app.utils.validators import CategoryEnum
 from app.config.settings import get_settings
-from app.ai.translator import RussianTranslator, UzbekTranslator
 
 settings = get_settings()
 CHANNEL_FOOTER = getattr(
@@ -18,8 +17,7 @@ CHANNEL_FOOTER = getattr(
 
 class PostFormatter:
     """
-    Standardized templates for Telegram posts in Bilingual format (Uzbek + Russian)
-    according to specification.
+    Standardized templates for Telegram posts in Uzbek according to specification.
     """
 
     @staticmethod
@@ -27,39 +25,19 @@ class PostFormatter:
         title: str,
         summary: str,
         key_points: List[str],
-        source_url: str,
-        title_ru: Optional[str] = None,
-        summary_ru: Optional[str] = None,
-        key_points_ru: Optional[List[str]] = None
+        source_url: str
     ) -> str:
-        t_uz = title.strip()
-        t_ru = (title_ru or RussianTranslator.translate_sentence(title)).strip()
-        s_uz = summary.strip()
-        s_ru = (summary_ru or RussianTranslator.translate_sentence(summary)).strip()
-
-        pts_uz = key_points or []
-        pts_ru = key_points_ru or [RussianTranslator.translate_sentence(p) for p in pts_uz]
-
-        points_block_uz = ""
-        if pts_uz:
-            points_block_uz = "\n" + "\n".join(f"• {pt}" for pt in pts_uz)
-
-        points_block_ru = ""
-        if pts_ru:
-            points_block_ru = "\n" + "\n".join(f"• {pt}" for pt in pts_ru)
+        points_block = ""
+        if key_points:
+            points_block = "\n📌 <b>Muhim:</b>\n" + "\n".join(f"• {pt}" for pt in key_points)
 
         return (
-            f"🔥 <b>MLBB YANGILIGI</b> | <b>НОВОСТИ MLBB</b>\n\n"
-            f"🇺🇿 <b>O‘zbekcha:</b>\n"
-            f"<b>{t_uz}</b>\n"
-            f"{s_uz}"
-            f"{points_block_uz}\n\n"
-            f"🇷🇺 <b>Русский:</b>\n"
-            f"<b>{t_ru}</b>\n"
-            f"{s_ru}"
-            f"{points_block_ru}\n\n"
-            f"🔗 <b>Manba / Источник:</b> <a href=\"{source_url}\">Rasmiy havola / Ссылка</a>\n\n"
-            f"#MLBB #Yangilik #Новости\n\n"
+            f"🔥 <b>MLBB YANGILIGI</b>\n\n"
+            f"<b>{title}</b>\n\n"
+            f"{summary}"
+            f"{points_block}\n\n"
+            f"🔗 <b>Manba:</b> <a href=\"{source_url}\">Rasmiy havola</a>\n\n"
+            f"#MLBB #Yangilik\n\n"
             f"{CHANNEL_FOOTER}"
         )
 
@@ -70,28 +48,17 @@ class PostFormatter:
         price: str,
         release_date: str,
         description: str,
-        source_url: str,
-        price_ru: Optional[str] = None,
-        release_date_ru: Optional[str] = None,
-        description_ru: Optional[str] = None
+        source_url: str
     ) -> str:
-        p_ru = price_ru or RussianTranslator.translate_sentence(price)
-        d_ru = release_date_ru or RussianTranslator.translate_sentence(release_date)
-        desc_ru = description_ru or RussianTranslator.translate_sentence(description)
-
-        price_line = f"{price} | {p_ru}" if p_ru and p_ru != price else price
-        date_line = f"{release_date} | {d_ru}" if d_ru and d_ru != release_date else release_date
-
         return (
-            f"✨ <b>YANGI SKIN</b> | <b>НОВЫЙ СКИН</b>\n\n"
-            f"🦸 <b>Hero / Герой:</b> {hero}\n"
-            f"🎨 <b>Skin / Скин:</b> {skin_name}\n"
-            f"💎 <b>Narxi / Цена:</b> {price_line}\n"
-            f"📅 <b>Sana / Дата:</b> {date_line}\n\n"
-            f"🇺🇿 <b>O‘zbekcha:</b>\n{description}\n\n"
-            f"🇷🇺 <b>Русский:</b>\n{desc_ru}\n\n"
-            f"🔗 <b>Manba / Источник:</b> <a href=\"{source_url}\">Batafsil / Подробнее</a>\n\n"
-            f"#MLBB #Skin #Скины\n\n"
+            f"✨ <b>YANGI SKIN</b>\n\n"
+            f"🦸 <b>Hero:</b> {hero}\n"
+            f"🎨 <b>Skin:</b> {skin_name}\n"
+            f"💎 <b>Narxi:</b> {price}\n"
+            f"📅 <b>Chiqish sanasi:</b> {release_date}\n\n"
+            f"{description}\n\n"
+            f"🔗 <b>Manba:</b> <a href=\"{source_url}\">Batafsil</a>\n\n"
+            f"#MLBB #Skin\n\n"
             f"{CHANNEL_FOOTER}"
         )
 
@@ -103,59 +70,51 @@ class PostFormatter:
         adjustments: List[str],
         source_url: str,
         summary: str = "",
-        revamps: Optional[List[str]] = None,
-        summary_ru: Optional[str] = None
+        revamps: Optional[List[str]] = None
     ) -> str:
-        s_ru = summary_ru or RussianTranslator.translate_sentence(summary)
-
         lines = [
-            "🛠 <b>MLBB PATCH NOTES YANGILANISHI</b> | <b>ОБНОВЛЕНИЕ ПАТЧА</b>\n",
-            f"📌 <b>Versiya / Версия:</b> {version}\n"
+            "🛠 <b>MLBB PATCH NOTES YANGILANISHI</b>\n",
+            f"📌 <b>Versiya:</b> {version}\n"
         ]
 
         if summary:
             clean_summary = summary.strip()
-            lines.append("🇺🇿 <b>O‘zbekcha:</b>")
-            lines.append(f"{clean_summary}\n")
-        if s_ru and s_ru.strip():
-            clean_s_ru = s_ru.strip()
-            lines.append("🇷🇺 <b>Русский:</b>")
-            lines.append(f"{clean_s_ru}\n")
+            lines.append(f"📝 <b>Tavsif:</b>\n{clean_summary}\n")
 
         has_changes = bool(buffs or nerfs or adjustments or revamps)
         if has_changes:
-            lines.append("⚔️ <b>Qahramonlar o‘zgarishlari / Изменения героев:</b>")
+            lines.append("⚔️ <b>Qahramonlar o‘zgarishlari:</b>")
 
             if revamps:
                 rev_str = ", ".join(revamps) if isinstance(revamps, list) else str(revamps)
-                lines.append(f"🟣 <b>REVAMP / РЕВАМП:</b> {rev_str}")
+                lines.append(f"🟣 <b>REVAMP:</b> {rev_str}")
 
             if buffs:
                 if len(buffs) <= 4 and any(" " in b for b in buffs):
-                    lines.append("🟢 <b>BUFF / БАФФ:</b>")
+                    lines.append("🟢 <b>BUFF:</b>")
                     for b in buffs:
                         lines.append(f"• {b}")
                 else:
-                    lines.append(f"🟢 <b>BUFF / БАФФ:</b> {', '.join(buffs)}")
+                    lines.append(f"🟢 <b>BUFF:</b> {', '.join(buffs)}")
 
             if nerfs:
                 if len(nerfs) <= 4 and any(" " in n for n in nerfs):
-                    lines.append("🔴 <b>NERF / НЕРФ:</b>")
+                    lines.append("🔴 <b>NERF:</b>")
                     for n in nerfs:
                         lines.append(f"• {n}")
                 else:
-                    lines.append(f"🔴 <b>NERF / НЕРФ:</b> {', '.join(nerfs)}")
+                    lines.append(f"🔴 <b>NERF:</b> {', '.join(nerfs)}")
 
             if adjustments:
                 if len(adjustments) <= 4 and any(" " in a for a in adjustments):
-                    lines.append("🟡 <b>ADJUSTMENT / КОРРЕКТИРОВКА:</b>")
+                    lines.append("🟡 <b>ADJUSTMENT:</b>")
                     for a in adjustments:
                         lines.append(f"• {a}")
                 else:
-                    lines.append(f"🟡 <b>ADJUSTMENT / КОРРЕКТИРОВКА:</b> {', '.join(adjustments)}")
+                    lines.append(f"🟡 <b>ADJUSTMENT:</b> {', '.join(adjustments)}")
 
-        lines.append(f"\n🔗 <b>Batafsil / Подробнее:</b> <a href=\"{source_url}\">Rasmiy havola / Ссылка</a>\n")
-        lines.append("#MLBB #Patch #Yangilanish #Обновление #MobileLegends\n")
+        lines.append(f"\n🔗 <b>Batafsil ma'lumot:</b> <a href=\"{source_url}\">Rasmiy havola</a>\n")
+        lines.append("#MLBB #Patch #Yangilanish #MobileLegends\n")
         lines.append(CHANNEL_FOOTER)
 
         return "\n".join(lines)
@@ -166,39 +125,21 @@ class PostFormatter:
         role: str,
         description: str,
         skills: Optional[List[str]] = None,
-        source_url: str = "",
-        role_ru: Optional[str] = None,
-        description_ru: Optional[str] = None,
-        skills_ru: Optional[List[str]] = None
+        source_url: str = ""
     ) -> str:
-        r_ru = role_ru or RussianTranslator.translate_sentence(role)
-        desc_ru = description_ru or RussianTranslator.translate_sentence(description)
-        s_ru = skills_ru or ([RussianTranslator.translate_sentence(s) for s in skills] if skills else [])
-
-        role_line = f"{role} | {r_ru}" if r_ru and r_ru != role else role
-
         lines = [
-            "🦸 <b>YANGI QAHRAMON / REVAMP</b> | <b>НОВЫЙ ГЕРОЙ / РЕВАМП</b>\n",
-            f"👤 <b>Qahramon / Герой:</b> {hero_name}",
-            f"🎭 <b>Roli / Роль:</b> {role_line}\n",
-            "🇺🇿 <b>O‘zbekcha:</b>",
+            "🦸 <b>YANGI QAHRAMON / REVAMP</b>\n",
+            f"👤 <b>Qahramon:</b> {hero_name}",
+            f"🎭 <b>Roli:</b> {role}\n",
             f"{description}"
         ]
         if skills:
-            lines.append("⚡️ <i>Qobiliyatlar:</i>")
+            lines.append("\n⚡️ <b>Asosiy qobiliyatlar:</b>")
             for sk in skills[:3]:
                 lines.append(f"• {sk}")
-
-        lines.append("\n🇷🇺 <b>Русский:</b>")
-        lines.append(f"{desc_ru}")
-        if s_ru:
-            lines.append("⚡️ <i>Навыки:</i>")
-            for sk in s_ru[:3]:
-                lines.append(f"• {sk}")
-
         if source_url:
-            lines.append(f"\n🔗 <b>Batafsil / Подробнее:</b> <a href=\"{source_url}\">Ko‘rish / Смотреть</a>\n")
-        lines.append("#MLBB #Hero #Герой #Yangilik\n")
+            lines.append(f"\n🔗 <b>Batafsil:</b> <a href=\"{source_url}\">Ko‘rish</a>\n")
+        lines.append("#MLBB #Hero #Yangilik\n")
         lines.append(CHANNEL_FOOTER)
         return "\n".join(lines)
 
@@ -208,42 +149,22 @@ class PostFormatter:
         description: str,
         rewards: Optional[List[str]] = None,
         duration: Optional[str] = None,
-        source_url: str = "",
-        title_ru: Optional[str] = None,
-        description_ru: Optional[str] = None,
-        rewards_ru: Optional[List[str]] = None,
-        duration_ru: Optional[str] = None
+        source_url: str = ""
     ) -> str:
-        t_ru = title_ru or RussianTranslator.translate_sentence(title)
-        d_ru = description_ru or RussianTranslator.translate_sentence(description)
-        dur_ru = duration_ru or (RussianTranslator.translate_sentence(duration) if duration else "")
-        rw_ru = rewards_ru or ([RussianTranslator.translate_sentence(r) for r in rewards] if rewards else [])
-
         lines = [
-            "🎉 <b>MAXSUS TADBIR (EVENT)</b> | <b>СОБЫТИЕ</b>\n",
+            "🎉 <b>MAXSUS TADBIR (EVENT)</b>\n",
             f"🎪 <b>{title}</b>\n"
         ]
         if duration:
-            dur_display = f"{duration} | {dur_ru}" if dur_ru and dur_ru != duration else duration
-            lines.append(f"📅 <b>Muddati / Срок:</b> {dur_display}\n")
-
-        lines.append("🇺🇿 <b>O‘zbekcha:</b>")
+            lines.append(f"📅 <b>Muddati:</b> {duration}\n")
         lines.append(f"{description}")
         if rewards:
-            lines.append("🎁 <i>Mukofotlar:</i>")
+            lines.append("\n🎁 <b>Mukofotlar va imkoniyatlar:</b>")
             for rw in rewards[:4]:
                 lines.append(f"• {rw}")
-
-        lines.append("\n🇷🇺 <b>Русский:</b>")
-        lines.append(f"{d_ru}")
-        if rw_ru:
-            lines.append("🎁 <i>Награды:</i>")
-            for rw in rw_ru[:4]:
-                lines.append(f"• {rw}")
-
         if source_url:
-            lines.append(f"\n🔗 <b>Batafsil / Подробнее:</b> <a href=\"{source_url}\">Rasmiy manba / Ссылка</a>\n")
-        lines.append("#MLBB #Event #Tadbir #События\n")
+            lines.append(f"\n🔗 <b>Batafsil:</b> <a href=\"{source_url}\">Rasmiy manba</a>\n")
+        lines.append("#MLBB #Event #Tadbir\n")
         lines.append(CHANNEL_FOOTER)
         return "\n".join(lines)
 
@@ -253,14 +174,14 @@ class PostFormatter:
         matches: List[Dict[str, str]]
     ) -> str:
         lines = [
-            "🇮🇩 <b>MPL ID — BUGUNGI O‘YINLAR</b> | <b>РАСПИСАНИЕ МАТЧЕЙ</b>\n",
+            f"🇮🇩 <b>MPL ID — BUGUNGI O‘YINLAR</b>\n",
             f"📅 <b>{date_str}</b>\n"
         ]
         for m in matches:
             lines.append(f"🎮 <b>{m.get('team_a', 'Team A')}</b> 🆚 <b>{m.get('team_b', 'Team B')}</b>")
             lines.append(f"🕐 {m.get('time', 'TBD')}\n")
 
-        lines.append("#MPLID #MLBB #Esports\n")
+        lines.append("#MPLID #MLBB\n")
         lines.append(CHANNEL_FOOTER)
         return "\n".join(lines)
 
@@ -276,7 +197,7 @@ class PostFormatter:
         source_url: Optional[str] = None
     ) -> str:
         lines = [
-            "🇮🇩 <b>MPL ID — NATIJA</b> | <b>РЕЗУЛЬТАТ</b>\n",
+            "🇮🇩 <b>MPL ID — NATIJA</b>\n",
             f"<b>{team_a} {score_a} — {score_b} {team_b}</b>\n"
         ]
         if mvp and str(mvp).strip() and str(mvp).lower() not in ("unknown", "none", "yo'q", "mavjud emas", "null"):
@@ -292,7 +213,7 @@ class PostFormatter:
             lines.append("\n".join(info_lines) + "\n")
 
         if source_url:
-            lines.append(f"🔗 <b>Batafsil / Подробнее:</b> <a href=\"{source_url}\">Havola / Ссылка</a>\n")
+            lines.append(f"🔗 <b>Batafsil:</b> <a href=\"{source_url}\">Havola</a>\n")
 
         lines.append("#MPLID #MLBB @murodalievgg\n")
         lines.append(CHANNEL_FOOTER)
@@ -310,7 +231,7 @@ class PostFormatter:
         source_url: Optional[str] = None
     ) -> str:
         lines = [
-            "🇲🇾 <b>MPL MY — NATIJA</b> | <b>РЕЗУЛЬТАТ</b>\n",
+            "🇲🇾 <b>MPL MY — NATIJA</b>\n",
             f"<b>{team_a} {score_a} — {score_b} {team_b}</b>\n"
         ]
         if mvp and str(mvp).strip() and str(mvp).lower() not in ("unknown", "none", "yo'q", "mavjud emas", "null"):
@@ -326,7 +247,7 @@ class PostFormatter:
             lines.append("\n".join(info_lines) + "\n")
 
         if source_url:
-            lines.append(f"🔗 <b>Batafsil / Подробнее:</b> <a href=\"{source_url}\">Havola / Ссылка</a>\n")
+            lines.append(f"🔗 <b>Batafsil:</b> <a href=\"{source_url}\">Havola</a>\n")
 
         lines.append("#MPLMY #MLBB @murodalievgg\n")
         lines.append(CHANNEL_FOOTER)
@@ -344,7 +265,7 @@ class PostFormatter:
         source_url: Optional[str] = None
     ) -> str:
         lines = [
-            "🇵🇭 <b>MPL PH — NATIJA</b> | <b>РЕЗУЛЬТАТ</b>\n",
+            "🇵🇭 <b>MPL PH — NATIJA</b>\n",
             f"<b>{team_a} {score_a} — {score_b} {team_b}</b>\n"
         ]
         if mvp and str(mvp).strip() and str(mvp).lower() not in ("unknown", "none", "yo'q", "mavjud emas", "null"):
@@ -360,7 +281,7 @@ class PostFormatter:
             lines.append("\n".join(info_lines) + "\n")
 
         if source_url:
-            lines.append(f"🔗 <b>Batafsil / Подробнее:</b> <a href=\"{source_url}\">Havola / Ссылка</a>\n")
+            lines.append(f"🔗 <b>Batafsil:</b> <a href=\"{source_url}\">Havola</a>\n")
 
         lines.append("#MPLPH #MLBB @murodalievgg\n")
         lines.append(CHANNEL_FOOTER)
@@ -372,7 +293,7 @@ class PostFormatter:
         match_data: Dict[str, Any],
         source_url: Optional[str] = None
     ) -> str:
-        """Format bilingual caption dynamically from structured match data."""
+        """Format Uzbek caption dynamically from structured match data."""
         league = str(match_data.get("league", "MPL ID")).upper()
         team_a = match_data.get("team_a", "Team A")
         team_b = match_data.get("team_b", "Team B")
@@ -417,29 +338,27 @@ class PostFormatter:
             )
 
     @staticmethod
-    def _build_upcoming_body(
-        flag: str,
-        league_name: str,
+    def format_mpl_id_upcoming(
         team_a: str,
         team_b: str,
-        time_str: str,
-        date_str: str,
-        week: Optional[Any],
-        series: str,
-        source_url: Optional[str],
-        countdown_str: Optional[str],
-        ai_prediction: Optional[Dict[str, Any]],
-        hashtag: str
+        time_str: str = "15:00",
+        date_str: str = "",
+        week: Optional[Any] = None,
+        series: str = "BO3",
+        source_url: Optional[str] = None,
+        countdown_str: Optional[str] = None,
+        ai_prediction: Optional[Dict[str, Any]] = None
     ) -> str:
         lines = [
-            f"{flag} <b>{league_name} — KUTILAYOTGAN O‘YIN</b> | <b>ПРЕДСТОЯЩИЙ МАТЧ</b>\n",
+            "🇮🇩 <b>MPL ID — KUTILAYOTGAN O‘YIN</b>\n",
             f"<b>{team_a} 🆚 {team_b}</b>\n"
         ]
         info_lines = []
         if time_str:
-            info_lines.append(f"🕐 <b>Vaqt / Время:</b> {time_str}")
+            time_clean = time_str if ("WIB" in time_str or "UZ" in time_str) else f"{time_str} (WIB)"
+            info_lines.append(f"🕐 <b>Vaqt:</b> {time_clean}")
         if countdown_str and countdown_str != "Tugagan":
-            info_lines.append(f"⏳ <b>O‘yinga qolgan vaqt / До матча:</b> {countdown_str}")
+            info_lines.append(f"⏳ <b>O‘yinga qolgan vaqt:</b> {countdown_str}")
         if week:
             week_text = f"Week {week}" if str(week).isdigit() else str(week)
             info_lines.append(f"📌 {week_text} • {series}")
@@ -456,59 +375,24 @@ class PostFormatter:
             sb = ai_prediction.get("predicted_score_b", 1)
             pa = ai_prediction.get("prob_a", 55)
             pb = ai_prediction.get("prob_b", 45)
-            comm_uz = ai_prediction.get("commentary_uz", "").strip()
-            comm_ru = ai_prediction.get("commentary_ru", "").strip()
-            if not comm_ru and comm_uz:
-                comm_ru = RussianTranslator.translate_sentence(comm_uz)
+            comm = ai_prediction.get("commentary_uz", "").strip()
 
-            lines.append("🤖 <b>AI TAHLILI VA TAXMINIY HISOB / AI ПРОГНОЗ:</b>")
-            lines.append(f"🎯 <b>Taxminiy hisob / Прогноз счета:</b> <code>{team_a} {sa} — {sb} {team_b}</code>")
-            lines.append(f"📊 <b>G‘alaba ehtimoli / Вероятность:</b> {team_a} ({pa}%) | {team_b} ({pb}%)")
-            if comm_uz:
-                lines.append(f"🎙 🇺🇿 <i>{comm_uz}</i>")
-            if comm_ru:
-                lines.append(f"🎙 🇷🇺 <i>{comm_ru}</i>")
+            lines.append("🤖 <b>AI TAHLILI VA TAXMINIY HISOB:</b>")
+            lines.append(f"🎯 <b>Taxminiy hisob:</b> <code>{team_a} {sa} — {sb} {team_b}</code>")
+            lines.append(f"📊 <b>G‘alaba ehtimoli:</b> {team_a} ({pa}%) | {team_b} ({pb}%)")
+            if comm:
+                lines.append(f"🎙 <i>{comm}</i>")
             lines.append("")
 
         if source_url:
-            lines.append(f"🔗 <b>Batafsil / Подробнее:</b> <a href=\"{source_url}\">Liquipedia</a>\n")
+            lines.append(f"🔗 <b>Batafsil:</b> <a href=\"{source_url}\">Liquipedia</a>\n")
 
-        lines.append(f"{hashtag} #MLBB #AIPrognoz #Прогноз @murodalievgg\n")
+        lines.append("#MPLID #MLBB #AIPrognoz @murodalievgg\n")
         lines.append(CHANNEL_FOOTER)
         return "\n".join(lines)
 
-    @classmethod
-    def format_mpl_id_upcoming(
-        cls,
-        team_a: str,
-        team_b: str,
-        time_str: str = "15:00",
-        date_str: str = "",
-        week: Optional[Any] = None,
-        series: str = "BO3",
-        source_url: Optional[str] = None,
-        countdown_str: Optional[str] = None,
-        ai_prediction: Optional[Dict[str, Any]] = None
-    ) -> str:
-        time_clean = time_str if ("WIB" in time_str or "UZ" in time_str) else f"{time_str} (WIB)"
-        return cls._build_upcoming_body(
-            flag="🇮🇩",
-            league_name="MPL ID",
-            team_a=team_a,
-            team_b=team_b,
-            time_str=time_clean,
-            date_str=date_str,
-            week=week,
-            series=series,
-            source_url=source_url,
-            countdown_str=countdown_str,
-            ai_prediction=ai_prediction,
-            hashtag="#MPLID"
-        )
-
-    @classmethod
+    @staticmethod
     def format_mpl_ph_upcoming(
-        cls,
         team_a: str,
         team_b: str,
         time_str: str = "17:00",
@@ -519,25 +403,50 @@ class PostFormatter:
         countdown_str: Optional[str] = None,
         ai_prediction: Optional[Dict[str, Any]] = None
     ) -> str:
-        time_clean = time_str if ("PHT" in time_str or "UZ" in time_str) else f"{time_str} (PHT)"
-        return cls._build_upcoming_body(
-            flag="🇵🇭",
-            league_name="MPL PH",
-            team_a=team_a,
-            team_b=team_b,
-            time_str=time_clean,
-            date_str=date_str,
-            week=week,
-            series=series,
-            source_url=source_url,
-            countdown_str=countdown_str,
-            ai_prediction=ai_prediction,
-            hashtag="#MPLPH"
-        )
+        lines = [
+            "🇵🇭 <b>MPL PH — KUTILAYOTGAN O‘YIN</b>\n",
+            f"<b>{team_a} 🆚 {team_b}</b>\n"
+        ]
+        info_lines = []
+        if time_str:
+            time_clean = time_str if ("PHT" in time_str or "UZ" in time_str) else f"{time_str} (PHT)"
+            info_lines.append(f"🕐 <b>Vaqt:</b> {time_clean}")
+        if countdown_str and countdown_str != "Tugagan":
+            info_lines.append(f"⏳ <b>O‘yinga qolgan vaqt:</b> {countdown_str}")
+        if week:
+            week_text = f"Week {week}" if str(week).isdigit() else str(week)
+            info_lines.append(f"📌 {week_text} • {series}")
+        elif series:
+            info_lines.append(f"📌 {series}")
+        if date_str:
+            info_lines.append(f"📅 {date_str}")
+        if info_lines:
+            lines.append("\n".join(info_lines) + "\n")
 
-    @classmethod
+        # AI Prediction Block
+        if ai_prediction:
+            sa = ai_prediction.get("predicted_score_a", 2)
+            sb = ai_prediction.get("predicted_score_b", 1)
+            pa = ai_prediction.get("prob_a", 55)
+            pb = ai_prediction.get("prob_b", 45)
+            comm = ai_prediction.get("commentary_uz", "").strip()
+
+            lines.append("🤖 <b>AI TAHLILI VA TAXMINIY HISOB:</b>")
+            lines.append(f"🎯 <b>Taxminiy hisob:</b> <code>{team_a} {sa} — {sb} {team_b}</code>")
+            lines.append(f"📊 <b>G‘alaba ehtimoli:</b> {team_a} ({pa}%) | {team_b} ({pb}%)")
+            if comm:
+                lines.append(f"🎙 <i>{comm}</i>")
+            lines.append("")
+
+        if source_url:
+            lines.append(f"🔗 <b>Batafsil:</b> <a href=\"{source_url}\">Liquipedia</a>\n")
+
+        lines.append("#MPLPH #MLBB #AIPrognoz @murodalievgg\n")
+        lines.append(CHANNEL_FOOTER)
+        return "\n".join(lines)
+
+    @staticmethod
     def format_mpl_my_upcoming(
-        cls,
         team_a: str,
         team_b: str,
         time_str: str = "15:00",
@@ -548,21 +457,47 @@ class PostFormatter:
         countdown_str: Optional[str] = None,
         ai_prediction: Optional[Dict[str, Any]] = None
     ) -> str:
-        time_clean = time_str if ("MYT" in time_str or "UZ" in time_str) else f"{time_str} (MYT)"
-        return cls._build_upcoming_body(
-            flag="🇲🇾",
-            league_name="MPL MY",
-            team_a=team_a,
-            team_b=team_b,
-            time_str=time_clean,
-            date_str=date_str,
-            week=week,
-            series=series,
-            source_url=source_url,
-            countdown_str=countdown_str,
-            ai_prediction=ai_prediction,
-            hashtag="#MPLMY"
-        )
+        lines = [
+            "🇲🇾 <b>MPL MY — KUTILAYOTGAN O‘YIN</b>\n",
+            f"<b>{team_a} 🆚 {team_b}</b>\n"
+        ]
+        info_lines = []
+        if time_str:
+            time_clean = time_str if ("MYT" in time_str or "UZ" in time_str) else f"{time_str} (MYT)"
+            info_lines.append(f"🕐 <b>Vaqt:</b> {time_clean}")
+        if countdown_str and countdown_str != "Tugagan":
+            info_lines.append(f"⏳ <b>O‘yinga qolgan vaqt:</b> {countdown_str}")
+        if week:
+            week_text = f"Week {week}" if str(week).isdigit() else str(week)
+            info_lines.append(f"📌 {week_text} • {series}")
+        elif series:
+            info_lines.append(f"📌 {series}")
+        if date_str:
+            info_lines.append(f"📅 {date_str}")
+        if info_lines:
+            lines.append("\n".join(info_lines) + "\n")
+
+        # AI Prediction Block
+        if ai_prediction:
+            sa = ai_prediction.get("predicted_score_a", 2)
+            sb = ai_prediction.get("predicted_score_b", 1)
+            pa = ai_prediction.get("prob_a", 55)
+            pb = ai_prediction.get("prob_b", 45)
+            comm = ai_prediction.get("commentary_uz", "").strip()
+
+            lines.append("🤖 <b>AI TAHLILI VA TAXMINIY HISOB:</b>")
+            lines.append(f"🎯 <b>Taxminiy hisob:</b> <code>{team_a} {sa} — {sb} {team_b}</code>")
+            lines.append(f"📊 <b>G‘alaba ehtimoli:</b> {team_a} ({pa}%) | {team_b} ({pb}%)")
+            if comm:
+                lines.append(f"🎙 <i>{comm}</i>")
+            lines.append("")
+
+        if source_url:
+            lines.append(f"🔗 <b>Batafsil:</b> <a href=\"{source_url}\">Liquipedia</a>\n")
+
+        lines.append("#MPLMY #MLBB #AIPrognoz @murodalievgg\n")
+        lines.append(CHANNEL_FOOTER)
+        return "\n".join(lines)
 
     @classmethod
     def format_match_upcoming_from_data(
@@ -570,7 +505,7 @@ class PostFormatter:
         match_data: Dict[str, Any],
         source_url: Optional[str] = None
     ) -> str:
-        """Format bilingual caption dynamically for an upcoming match."""
+        """Format Uzbek caption dynamically for an upcoming match."""
         league = str(match_data.get("league", "MPL ID")).upper()
         team_a = match_data.get("team_a", "Team A")
         team_b = match_data.get("team_b", "Team B")
@@ -623,26 +558,15 @@ class PostFormatter:
         title: str,
         summary: str,
         tournament: Optional[str],
-        source_url: str,
-        title_ru: Optional[str] = None,
-        summary_ru: Optional[str] = None
+        source_url: str
     ) -> str:
-        t_uz = title.strip()
-        t_ru = (title_ru or RussianTranslator.translate_sentence(title)).strip()
-        s_uz = summary.strip()
-        s_ru = (summary_ru or RussianTranslator.translate_sentence(summary)).strip()
-
-        tourney_line = f"🏆 <b>Turnir / Турнир:</b> {tournament}\n\n" if tournament else ""
+        tourney_line = f"🏆 <b>Turnir:</b> {tournament}\n" if tournament else ""
         return (
-            f"🌍 <b>ESPORTS YANGILIGI | КИБЕРСПОРТ MLBB</b>\n\n"
+            f"🌍 <b>ESPORTS YANGILIGI</b>\n\n"
+            f"<b>{title}</b>\n\n"
             f"{tourney_line}"
-            f"🇺🇿 <b>O‘zbekcha:</b>\n"
-            f"<b>{t_uz}</b>\n"
-            f"{s_uz}\n\n"
-            f"🇷🇺 <b>Русский:</b>\n"
-            f"<b>{t_ru}</b>\n"
-            f"{s_ru}\n\n"
-            f"🔗 <b>Batafsil / Подробнее:</b> <a href=\"{source_url}\">Rasmiy manba / Ссылка</a>\n\n"
-            f"#Esports #MLBB #Киберспорт\n\n"
+            f"{summary}\n\n"
+            f"🔗 <b>Batafsil:</b> <a href=\"{source_url}\">Rasmiy manba</a>\n\n"
+            f"#Esports #MLBB\n\n"
             f"{CHANNEL_FOOTER}"
         )

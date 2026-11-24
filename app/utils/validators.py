@@ -295,21 +295,16 @@ class MatchItem(BaseModel):
 
 class AIPostOutput(BaseModel):
     """
-    AI Analyzer output schema following strict hallucination & bilingual translation rules.
+    AI Analyzer output schema following strict hallucination & translation rules.
     """
     category: CategoryEnum
     title: str
-    title_uz: Optional[str] = None
-    title_ru: Optional[str] = None
     summary_uz: str
-    summary_ru: Optional[str] = None
     formatted_post: str
     confidence: float = Field(ge=0.0, le=1.0)
     image_url: Optional[str] = None
     source_url: str
     key_points: List[str] = Field(default_factory=list)
-    key_points_uz: Optional[List[str]] = None
-    key_points_ru: Optional[List[str]] = None
     needs_review: bool = False
     verification_notes: Optional[str] = None
 

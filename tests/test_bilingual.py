@@ -1,55 +1,70 @@
 import pytest
+from app.services.counter_pick_service import CounterPickService
 from app.ai.formatter import PostFormatter
 from app.ai.analyzer import AIAnalyzer
-from app.ai.translator import UzbekTranslator, RussianTranslator
-from app.services.matchday_service import MatchdayService
-from app.services.meta_tier_service import MetaTierService
 from app.utils.validators import RawCollectedItem, CategoryEnum
 
 
-def test_bilingual_translator():
-    # Test Uzbek translator
-    uz = UzbekTranslator.translate_sentence("New Collector Skin 'Astral' for Lunox released on October 5.")
-    assert "Lunox" in uz
-    assert "Collector" in uz
+def test_format_counter_message_bilingual():
+    """Ensure Counter-Pick Assistant produces rich bilingual (Uzbek + Russian) analysis in one message."""
+    data = {
+        "hero_name": "Granger",
+        "slug": "granger",
+        "url": "https://mlbb.io/en/hero/granger/counter",
+        "best_pick": "Fanny",
+        "best_advantage": "+3.6% win rate advantage",
+        "counters": [
+            {"name": "Fanny", "advantage": "+3.6%"},
+            {"name": "Hilda", "advantage": "+2.8%"},
+            {"name": "Mathilda", "advantage": "+1.3%"}
+        ],
+        "item_counters": "Blade Armor, Antique Cuirass, Wind of Nature"
+    }
 
-    # Test Russian translator
-    ru = RussianTranslator.translate_sentence("New Collector Skin 'Astral' for Lunox released on October 5.")
-    assert "Lunox" in ru
-    assert "Collector" in ru
-    assert "Октября" in ru
+    formatted = CounterPickService.format_counter_message(data)
+
+    # 1. Header & Best Pick
+    assert "<b>mlbb.io</b>" in formatted
+    assert "Smart Assistant" in formatted
+    assert "Best Pick Against Granger" in formatted
+    assert "Fanny" in formatted
+    assert "+3.6%" in formatted
+
+    # 2. Uzbek Section
+    assert "🇺🇿 <b>O‘zbekcha:</b>" in formatted
+    assert "Granger" in formatted
+    assert "Top Counterlar" in formatted
+    assert "Tavsiya etilgan itemlar" in formatted
+    assert "Blade Armor" in formatted
+
+    # 3. Russian Section
+    assert "🇷🇺 <b>Русский:</b>" in formatted
+    assert "Лучший выбор против" in formatted
+    assert "Топ контр-пики" in formatted
+    assert "Рекомендуемые предметы" in formatted
+    assert "преимущество" in formatted
+
+    # 4. Official mlbb.io link
+    assert "https://mlbb.io/en/hero/granger/counter" in formatted
 
 
-def test_format_news_bilingual():
+def test_news_remains_uzbek():
+    """Ensure regular news posts remain 100% natural Uzbek without Russian sections."""
     post = PostFormatter.format_news(
         title="Yangi qahramon Land of Dawn ga qo‘shilmoqda",
         summary="Ushbu qahramon tez orada o‘yinda paydo bo‘ladi.",
         key_points=["Juda yuqori zarar", "Yangi mexanika"],
         source_url="https://mobilelegends.com"
     )
-    assert "🇺🇿 <b>O‘zbekcha:</b>" in post
-    assert "🇷🇺 <b>Русский:</b>" in post
-    assert "🔥 <b>MLBB YANGILIGI</b> | <b>НОВОСТИ MLBB</b>" in post
-    assert "#MLBB #Yangilik #Новости" in post
+    assert "🔥 <b>MLBB YANGILIGI</b>" in post
+    assert "#MLBB #Yangilik" in post
+    assert "🇺🇿" not in post
+    assert "🇷🇺" not in post
+    assert "Русский" not in post
 
 
-def test_format_skin_bilingual():
-    post = PostFormatter.format_skin(
-        hero="Gusion",
-        skin_name="Dimension Scourge",
-        price="899 Diamonds",
-        release_date="November 28",
-        description="Ajoyib yangi afsonaviy skin.",
-        source_url="https://mobilelegends.com"
-    )
-    assert "✨ <b>YANGI SKIN</b> | <b>НОВЫЙ СКИН</b>" in post
-    assert "🇺🇿 <b>O‘zbekcha:</b>" in post
-    assert "🇷🇺 <b>Русский:</b>" in post
-    assert "Gusion" in post
-    assert "#MLBB #Skin #Скины" in post
-
-
-def test_format_patch_bilingual():
+def test_patch_remains_uzbek():
+    """Ensure patch notes posts remain 100% natural Uzbek without Russian sections."""
     post = PostFormatter.format_patch(
         version="1.9.30",
         buffs=["Fanny", "Ling"],
@@ -58,54 +73,18 @@ def test_format_patch_bilingual():
         source_url="https://mobilelegends.com",
         summary="Qahramonlar balansi yangilandi."
     )
-    assert "🛠 <b>MLBB PATCH NOTES YANGILANISHI</b> | <b>ОБНОВЛЕНИЕ ПАТЧА</b>" in post
-    assert "🇺🇿 <b>O‘zbekcha:</b>" in post
-    assert "🇷🇺 <b>Русский:</b>" in post
+    assert "🛠 <b>MLBB PATCH NOTES YANGILANISHI</b>" in post
     assert "1.9.30" in post
     assert "Fanny" in post
     assert "Saber" in post
-
-
-def test_format_matchday_caption_bilingual():
-    matches = [
-        {"team_a": "RRQ", "team_b": "ONIC", "time": "15:00", "series": "BO3", "is_motd": True}
-    ]
-    motd_info = {
-        "motd_team_a": "RRQ",
-        "motd_team_b": "ONIC",
-        "hype_text": "Kunning eng kutilgan to‘qnashuvi!"
-    }
-    caption = MatchdayService.format_matchday_caption(
-        league="MPL ID",
-        date_str="2026-11-25",
-        matches=matches,
-        motd_info=motd_info
-    )
-    assert "BUGUNGI O‘YINLAR DASTURI | РАСПИСАНИЕ МАТЧЕЙ" in caption
-    assert "RRQ vs ONIC" in caption
-    assert "KUNNING MARKAZIY BAHSI / МАТЧ ДНЯ" in caption
-    assert "🎙 🇺🇿" in caption
-    assert "🎙 🇷🇺" in caption
-
-
-def test_format_meta_post_bilingual():
-    categorized = {
-        "strong_spammed": [{"hero_name": "Sun", "tier": "SS", "ban_rate": 35.8, "lane": ["Exp Lane"]}],
-        "traps": [{"hero_name": "Wanwan", "tier": "D", "role": ["Marksman"]}],
-        "hidden_gems": [{"hero_name": "Valir", "tier": "A", "ban_rate": 3.2, "lane": ["Mid Lane"]}]
-    }
-    post = MetaTierService.format_meta_post(categorized)
-    assert "MLBB META TAHLILI | АНАЛИЗ МЕТЫ MLBB" in post
-    assert "STRONG & SPAMMED" in post
-    assert "TRAPS TO AVOID" in post
-    assert "HIDDEN GEMS" in post
-    assert "Sun" in post
-    assert "Wanwan" in post
-    assert "Valir" in post
+    assert "🇺🇿" not in post
+    assert "🇷🇺" not in post
+    assert "Русский" not in post
 
 
 @pytest.mark.asyncio
-async def test_ai_analyzer_produces_bilingual_post():
+async def test_ai_analyzer_news_uzbek():
+    """Ensure AI Analyzer generates clean Uzbek news post."""
     analyzer = AIAnalyzer()
     raw = RawCollectedItem(
         source_url="https://mobilelegends.com/news/123",
@@ -117,9 +96,6 @@ async def test_ai_analyzer_produces_bilingual_post():
         reliability_score=100
     )
     output = await analyzer.analyze(raw)
-    assert "🇺🇿 <b>O‘zbekcha:</b>" in output.formatted_post
-    assert "🇷🇺 <b>Русский:</b>" in output.formatted_post
-    assert output.title_uz is not None
-    assert output.title_ru is not None
-    assert output.summary_uz is not None
-    assert output.summary_ru is not None
+    assert output.category == CategoryEnum.NEWS
+    assert "🇺🇿" not in output.formatted_post
+    assert "🇷🇺" not in output.formatted_post

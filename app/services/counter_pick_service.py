@@ -224,44 +224,71 @@ class CounterPickService:
     @classmethod
     def format_counter_message(cls, data: Dict[str, Any]) -> str:
         """
-        Formats telegram message matching the exact smart assistant visual style.
+        Formats telegram message matching the exact smart assistant visual style
+        in Bilingual format (Uzbek + Russian in one single message).
         Includes mlbb.io link at the bottom so Telegram renders the rich banner preview.
         """
         hero_name = data["hero_name"]
         best_pick = data["best_pick"]
+        best_adv = data.get("best_advantage") or ""
         url = data["url"]
 
-        # Additional top counters bullet points if available
+        best_adv_str = f" ({best_adv})" if best_adv else ""
+
+        # Top counters bullet points
         counters = data.get("counters", [])
-        extra_lines = []
+        extra_lines_uz = []
+        extra_lines_ru = []
         if len(counters) > 1:
-            for idx, c in enumerate(counters[:3], 1):
-                adv_str = f" ({c['advantage']})" if c.get("advantage") else ""
-                extra_lines.append(f"• <b>{c['name']}</b>{adv_str}")
+            for c in counters[:3]:
+                adv = c.get("advantage", "")
+                adv_uz = f" ({adv} ustunlik)" if adv else ""
+                adv_ru = f" ({adv} преимущество)" if adv else ""
+                extra_lines_uz.append(f"• <b>{c['name']}</b>{adv_uz}")
+                extra_lines_ru.append(f"• <b>{c['name']}</b>{adv_ru}")
 
-        items = data.get("item_counters")
-        items_block = f"\n🛡️ <b>Tavsiya etilgan itemlar:</b> <i>{items}</i>\n" if items else ""
+        items = data.get("item_counters") or ""
+        items_block_uz = f"🛡️ <b>Tavsiya etilgan itemlar:</b> <i>{items}</i>" if items else ""
+        items_block_ru = f"🛡️ <b>Рекомендуемые предметы:</b> <i>{items}</i>" if items else ""
 
-        extra_section = ""
-        if extra_lines:
-            extra_section = "🔥 <b>Top Counterlar:</b>\n" + "\n".join(extra_lines) + "\n"
+        top_section_uz = ""
+        if extra_lines_uz:
+            top_section_uz = "🔥 <b>Top Counterlar:</b>\n" + "\n".join(extra_lines_uz)
+
+        top_section_ru = ""
+        if extra_lines_ru:
+            top_section_ru = "🔥 <b>Топ контр-пики:</b>\n" + "\n".join(extra_lines_ru)
+
+        uz_parts = [
+            f"⚔️ <b>{hero_name}</b> ga qarshi eng yaxshi javob — <b>{best_pick}</b>!"
+        ]
+        if top_section_uz:
+            uz_parts.append(top_section_uz)
+        if items_block_uz:
+            uz_parts.append(items_block_uz)
+
+        ru_parts = [
+            f"⚔️ Лучший выбор против <b>{hero_name}</b> — <b>{best_pick}</b>!"
+        ]
+        if top_section_ru:
+            ru_parts.append(top_section_ru)
+        if items_block_ru:
+            ru_parts.append(items_block_ru)
 
         lines = [
             "<b>mlbb.io</b>                                      <code>Smart Assistant</code>",
             f"🛡️ <b>Best Pick Against {hero_name}</b> 🛡️",
             "",
-            f"<b>{best_pick}</b>",
+            f"👑 <b>{best_pick}</b>{best_adv_str}",
             "",
-        ]
-
-        if extra_section:
-            lines.append(extra_section)
-        if items_block:
-            lines.append(items_block)
-
-        lines.extend([
+            "🇺🇿 <b>O‘zbekcha:</b>",
+            "\n".join(uz_parts),
+            "",
+            "🇷🇺 <b>Русский:</b>",
+            "\n".join(ru_parts),
+            "",
             "More counters, matchup reasons, and full details are available on MLBB.io.",
             url
-        ])
+        ]
 
         return "\n".join(lines)
