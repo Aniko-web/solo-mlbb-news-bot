@@ -59,6 +59,11 @@ class CounterPickService:
     def slugify_hero_name(cls, name: str) -> str:
         """Converts user input into official mlbb.io hero URL slug."""
         cleaned = name.strip().lower()
+        from app.ai.translator import RussianTranslator
+        en_lookup = RussianTranslator.lookup_hero_by_russian(cleaned)
+        if en_lookup:
+            cleaned = en_lookup.lower()
+
         if cleaned in HERO_SLUG_OVERRIDES:
             return HERO_SLUG_OVERRIDES[cleaned]
         s = cleaned.replace("'", "").replace(".", "")
@@ -68,6 +73,11 @@ class CounterPickService:
     def get_canonical_hero_name(cls, raw_query: str) -> str:
         """Returns clean display name for hero."""
         raw = raw_query.strip()
+        from app.ai.translator import RussianTranslator
+        en_lookup = RussianTranslator.lookup_hero_by_russian(raw)
+        if en_lookup:
+            raw = en_lookup
+
         slug = cls.slugify_hero_name(raw)
 
         # Common display name adjustments
@@ -235,21 +245,37 @@ class CounterPickService:
 
         best_adv_str = f" ({best_adv})" if best_adv else ""
 
+        from app.ai.translator import RussianTranslator
+
+        # Russian translations for heroes and items
+        hero_ru = RussianTranslator.translate_hero_name(hero_name)
+        best_pick_ru = RussianTranslator.translate_hero_name(best_pick)
+
+        hero_disp_ru = f"{hero_ru} ({hero_name})" if hero_ru.lower() != hero_name.lower() else hero_name
+        best_disp_ru = f"{best_pick_ru} ({best_pick})" if best_pick_ru.lower() != best_pick.lower() else best_pick
+
         # Top counters bullet points
         counters = data.get("counters", [])
         extra_lines_uz = []
         extra_lines_ru = []
         if len(counters) > 1:
             for c in counters[:3]:
+                c_name = c['name']
+                c_ru = RussianTranslator.translate_hero_name(c_name)
+                c_disp_ru = f"{c_ru} ({c_name})" if c_ru.lower() != c_name.lower() else c_name
+
                 adv = c.get("advantage", "")
                 adv_uz = f" ({adv} ustunlik)" if adv else ""
                 adv_ru = f" ({adv} преимущество)" if adv else ""
-                extra_lines_uz.append(f"• <b>{c['name']}</b>{adv_uz}")
-                extra_lines_ru.append(f"• <b>{c['name']}</b>{adv_ru}")
+
+                extra_lines_uz.append(f"• <b>{c_name}</b>{adv_uz}")
+                extra_lines_ru.append(f"• <b>{c_disp_ru}</b>{adv_ru}")
 
         items = data.get("item_counters") or ""
         items_block_uz = f"🛡️ <b>Tavsiya etilgan itemlar:</b> <i>{items}</i>" if items else ""
-        items_block_ru = f"🛡️ <b>Рекомендуемые предметы:</b> <i>{items}</i>" if items else ""
+
+        items_ru = RussianTranslator.translate_items(items, include_en=True) if items else ""
+        items_block_ru = f"🛡️ <b>Рекомендуемые предметы:</b> <i>{items_ru}</i>" if items_ru else ""
 
         top_section_uz = ""
         if extra_lines_uz:
@@ -268,7 +294,7 @@ class CounterPickService:
             uz_parts.append(items_block_uz)
 
         ru_parts = [
-            f"⚔️ Лучший выбор против <b>{hero_name}</b> — <b>{best_pick}</b>!"
+            f"⚔️ Лучший выбор против <b>{hero_disp_ru}</b> — <b>{best_disp_ru}</b>!"
         ]
         if top_section_ru:
             ru_parts.append(top_section_ru)

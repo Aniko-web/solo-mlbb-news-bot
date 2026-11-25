@@ -593,7 +593,7 @@ def extract_hero_query_from_text(raw_text: str, bot_username: str = "") -> str:
         bot_tag_pattern = rf"@\b{re.escape(bot_username)}\b"
         raw = re.sub(bot_tag_pattern, "", raw, flags=re.IGNORECASE).strip()
 
-    prefix_pattern = r"^(?:[/\!#])?(?:counter|counterpick|cp|kontr|kontra)\b\s*"
+    prefix_pattern = r"^(?:[/\!#])?(?:counter|counterpick|cp|kontr|kontra|контр|контра)\b\s*"
     m = re.match(prefix_pattern, raw, flags=re.IGNORECASE)
     if m:
         raw = raw[m.end():].strip()
@@ -601,9 +601,9 @@ def extract_hero_query_from_text(raw_text: str, bot_username: str = "") -> str:
     return raw
 
 
-@bot_router.message(Command("counter", "counterpick", "cp"))
-@bot_router.message(F.text.regexp(r"(?i)^(?:[/\!#])?(?:counter|counterpick|cp|kontr|kontra)\b"))
-@bot_router.message(F.text.regexp(r"(?i)^@\w+\s+(?:counter\s+)?([a-zA-Z\s'\.\-]+)$"))
+@bot_router.message(Command("counter", "counterpick", "cp", "kontr", "kontra"))
+@bot_router.message(F.text.regexp(r"(?i)^(?:[/\!#])?(?:counter|counterpick|cp|kontr|kontra|контр|контра)\b"))
+@bot_router.message(F.text.regexp(r"(?i)^@\w+\s+(?:counter|kontr|контр)?\s*([a-zA-Zа-яА-ЯёЁ\s'\.\-]+)$"))
 async def cmd_counter_pick(message: Message, bot: Bot):
     """
     Looks up official mlbb.io counter-pick recommendations for any MLBB hero.

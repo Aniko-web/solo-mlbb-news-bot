@@ -40,12 +40,28 @@ def test_format_counter_message_bilingual():
     # 3. Russian Section
     assert "🇷🇺 <b>Русский:</b>" in formatted
     assert "Лучший выбор против" in formatted
+    assert "Грейнджер (Granger)" in formatted
+    assert "Фанни (Fanny)" in formatted
     assert "Топ контр-пики" in formatted
+    assert "Хильда (Hilda)" in formatted
     assert "Рекомендуемые предметы" in formatted
+    assert "Броня клинка (Blade Armor)" in formatted
+    assert "Древняя кираса (Antique Cuirass)" in formatted
+    assert "Ветер природы (Wind of Nature)" in formatted
     assert "преимущество" in formatted
 
     # 4. Official mlbb.io link
     assert "https://mlbb.io/en/hero/granger/counter" in formatted
+
+
+def test_russian_hero_slug_resolution():
+    """Ensure Russian/Cyrillic hero names resolve to the correct mlbb.io slug."""
+    assert CounterPickService.slugify_hero_name("Грейнджер") == "granger"
+    assert CounterPickService.slugify_hero_name("Фанни") == "fanny"
+    assert CounterPickService.slugify_hero_name("Хильда") == "hilda"
+    assert CounterPickService.slugify_hero_name("Чоу") == "chou"
+    assert CounterPickService.slugify_hero_name("И Сун-син") == "yi-sun-shin"
+    assert CounterPickService.slugify_hero_name("Юй Чжун") == "yu-zhong"
 
 
 def test_news_remains_uzbek():
